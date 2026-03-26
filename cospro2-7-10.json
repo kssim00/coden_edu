@@ -1,8 +1,0 @@
-{
-  "mainCat": "COS PRO 2급",
-  "subCat": "7차",
-  "title": "[7 차] 문제 10",
-  "desc": "<div class='desc-text'>...지문 생략...</div><div style='width: 100%; overflow-x: auto;'><table style='border:none; background:transparent; border-collapse:collapse; margin: 0 auto;'><tr><td style='border:none;'><svg width='30' height='210'><path d='M25,185 Q0,165 25,145' stroke='red' fill='none' stroke-width='1.5' marker-end='url(#r)'/><defs><marker id='r' viewBox='0 0 10 10' refX='8' refY='5' markerWidth='3' markerHeight='3' orient='auto'><path d='M0,0 L10,5 L0,10 Z' fill='red'/></marker></defs></svg></td><td style='border:none;'><table class='desc-table'>...표 내용...</table></td><td style='border:none;'><svg width='30' height='210'>...우측화살표...</svg></td></tr></table></div>",
-  "initial": "def solution(arr, N):\n    return 0",
-  "expected": "143"
-}
