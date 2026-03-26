@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>코드:앤 파이썬 스튜디오 (v9.7)</title>
+    <title>코드:앤 파이썬 스튜디오 (v9.8)</title>
     <!-- 라이브러리 로드 -->
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.36.1/min/vs/loader.min.js"></script>
@@ -11,12 +11,12 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 
     <style>
-        /* 1. 기본 UI 및 레이아웃 (VS Code Dark 스타일) */
+        /* 1. 기본 UI 및 레이아웃 (VS Code Dark 스타일 v8.1 복구) */
         :root { --vscode-bg: #1e1e1e; --vscode-side: #252526; --vscode-accent: #007acc; --vscode-text: #cccccc; }
         html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: var(--vscode-bg); color: var(--vscode-text); font-family: 'Pretendard', sans-serif; }
         .app-wrapper { display: none; height: 100vh; width: 100vw; overflow: hidden; display: flex; }
         
-        /* 얇고 투명한 다크 그레이 스크롤바 (4px) */
+        /* 얇은 스크롤바 */
         ::-webkit-scrollbar { width: 4px; height: 4px; }
         ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
         ::-webkit-scrollbar-track { background: transparent; }
@@ -25,30 +25,29 @@
         .spinner { width: 40px; height: 40px; border: 4px solid #333; border-top: 4px solid var(--vscode-accent); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         
-        /* 검은색 커스텀 관리자 모달 (pw-modal) */
-        .custom-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 10000; justify-content: center; align-items: center; }
-        .modal-box { background: #1e1e1e; padding: 30px; border-radius: 8px; border: 1px solid #444; width: 300px; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,1); }
+        /* v8.1 검은색 커스텀 모달 */
+        .custom-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 10000; justify-content: center; align-items: center; }
+        .modal-box { background: #252526; padding: 30px; border-radius: 12px; border: 1px solid #444; width: 320px; text-align: center; box-shadow: 0 10px 50px rgba(0,0,0,1); }
 
         .activity-bar { width: 50px; background: #333; display: flex; flex-direction: column; align-items: center; padding: 20px 0; justify-content: space-between; flex-shrink: 0; }
         .explorer { width: 250px; background: var(--vscode-side); border-right: 1px solid #333; display: flex; flex-direction: column; flex-shrink: 0; }
         .main-content { flex: 1; display: flex; overflow: hidden; position: relative; }
         
-        /* 2. 지문 포맷팅 엔진 스타일 (□ 스타일 및 테이블 격자) */
-        .description-panel { width: 420px; min-width: 150px; padding: 25px; border-right: 1px solid #333; background: #1e1e1e; overflow-y: auto; flex-shrink: 0; box-sizing: border-box; }
+        /* 지문 포맷팅 (PDF 완벽 재현) */
+        .description-panel { width: 400px; min-width: 150px; padding: 25px; border-right: 1px solid #333; background: #1e1e1e; overflow-y: auto; flex-shrink: 0; box-sizing: border-box; }
         .desc-section-title { font-weight: bold; color: #fff; margin: 25px 0 10px 0; font-size: 16px; border-left: 5px solid var(--vscode-accent); padding-left: 12px; line-height: 1.2; }
         .desc-text { line-height: 1.8; color: #ccc; font-size: 14.5px; margin-bottom: 12px; white-space: pre-wrap; }
-        .example-box { background: #2d2d2d; border-radius: 8px; padding: 15px; border: 1px solid #444; color: #eee; font-family: 'Courier New', monospace; margin: 12px 0; font-size: 13.5px; }
+        .example-box { background: #2d2d2d; border-radius: 8px; padding: 15px; border: 1px solid #444; color: #eee; font-family: 'Courier New', monospace; margin: 12px 0; }
         .description-panel table { width: 100%; border-collapse: collapse; margin: 15px 0; border: 1px solid #444; background: #252526; }
         .description-panel th, .description-panel td { border: 1px solid #444; padding: 8px; text-align: center; }
-        .description-panel th { background: #333; color: white; }
         .bg-yellow { background-color: #f1c40f !important; color: black !important; font-weight: bold; }
         .bg-blue { background-color: #3498db !important; color: white !important; }
 
-        /* 3. 리사이저 (10px 투명 감지 영역 유지) */
+        /* 리사이저 (v8.1 사양 + 10px 감지 영역) */
         .resizer-h { width: 8px; cursor: col-resize; background: transparent; z-index: 50; margin: 0 -4px; }
         .resizer-h:hover { background: rgba(0, 122, 204, 0.4); }
         .resizer-v { height: 10px; cursor: row-resize; background: transparent; z-index: 60; margin: -5px 0; position: relative; }
-        .resizer-v::before { content: ""; position: absolute; width: 100%; height: 20px; top: -5px; left: 0; right: 0; }
+        .resizer-v::before { content: ""; position: absolute; width: 100%; height: 10px; top: 0; left: 0; right: 0; }
         .resizer-v:hover { background: rgba(0, 122, 204, 0.4); }
 
         .editor-section { flex: 1; display: flex; flex-direction: column; min-width: 200px; position: relative; overflow: hidden; }
@@ -56,30 +55,44 @@
         .console-area { height: 200px; min-height: 35px; background: #000; padding: 8px 15px; border-top: 1px solid #333; overflow-y: auto; flex-shrink: 0; }
         #output { color: #00ff00; font-family: 'Courier New', monospace; white-space: pre-wrap; font-size: 14px; margin-top: 5px; }
         
-        .btn-run { position: absolute; right: 25px; top: 15px; z-index: 100; background: #28a745; color: white; border: none; padding: 8px 20px; cursor: pointer; font-weight: bold; border-radius: 4px; opacity: 0.5; pointer-events: none; }
-        .btn-run.ready { opacity: 1; pointer-events: auto; }
+        .btn-run { position: absolute; right: 25px; top: 15px; z-index: 100; background: #28a745; color: white; border: none; padding: 8px 20px; cursor: pointer; font-weight: bold; border-radius: 4px; }
 
+        /* 아코디언 탐색기 v8.1 스타일 */
         .main-cat-header { padding: 12px 15px; font-size: 12px; font-weight: bold; color: #fff; background: #37373d; cursor: pointer; border-bottom: 1px solid #222; }
         .sub-cat-header { padding: 10px 15px 10px 30px; font-size: 12px; font-weight: bold; color: #999; background: #2d2d2d; cursor: pointer; border-bottom: 1px solid #222; }
         .prob-item { padding: 8px 15px 8px 50px; cursor: pointer; font-size: 13px; color: #aaa; border-bottom: 1px solid #282828; }
-        .prob-item.active { background: #37373d; color: #fff; }
         .prob-item.solved { color: #28a745; font-weight: bold; }
-        .admin-input { background: #3c3c3c; border: 1px solid #555; color: white; padding: 10px; width: 100%; border-radius: 4px; text-align: center; }
+
+        /* 관리자 패널 v8.1 스타일 */
+        .floating-panel { display: none; position: fixed; top: 20px; left: 60px; right: 20px; bottom: 20px; background: #252526; border: 1px solid #444; border-radius: 12px; z-index: 1000; padding: 25px; overflow: hidden; }
+        .admin-input { background: #3c3c3c; border: 1px solid #555; color: white; padding: 10px; width: 100%; border-radius: 4px; margin-bottom: 10px; text-align: center; }
+        .master-table { width: 100%; border-collapse: collapse; color: #ddd; font-size: 12px; }
+        .master-table th, .master-table td { padding: 8px; border: 1px solid #333; text-align: center; }
     </style>
 </head>
 <body onselectstart="return !isDragging">
 
-<div id="loader" class="overlay">
-    <div class="spinner"></div>
-    <b id="loader-msg">스튜디오 초기화 중...</b>
-    <div id="debug-msg" style="margin-top: 20px; color: #666; font-size: 11px;"></div>
+<!-- F5 시 초기화를 위한 상단 스크립트 -->
+<script>localStorage.removeItem('coden_user_v81');</script>
+
+<div id="loader" class="overlay"><div class="spinner"></div><b id="loader-msg">데이터 동기화 중...</b></div>
+
+<!-- 관리자 인증 모달 -->
+<div id="pw-modal" class="custom-modal">
+    <div class="modal-box">
+        <h3 id="modal-title" style="color:white; margin-top:0;">관리자 인증</h3>
+        <input type="password" id="pw-input" class="admin-input" style="font-size:20px; letter-spacing:5px;" placeholder="····" onkeypress="if(event.keyCode==13) checkPw()">
+        <p style="color:#666; font-size:11px; margin-top:10px;">Enter를 누르면 확인됩니다.</p>
+        <button onclick="closePanels()" style="background:none; border:none; color:#444; cursor:pointer;">취소</button>
+    </div>
 </div>
 
-<div id="login-screen" class="overlay" style="display:none;">
-    <div style="background:#252526; padding:40px; border-radius:15px; width:320px; text-align:center; border:1px solid #444; box-shadow: 0 20px 50px rgba(0,0,0,0.5);">
+<div id="login-screen" class="overlay">
+    <div style="background:#252526; padding:40px; border-radius:15px; width:300px; text-align:center; border:1px solid #444;">
         <h2 style="color:white; margin-bottom:20px;">코드:앤 파이썬 스튜디오</h2>
-        <input type="text" id="user-name" class="admin-input" placeholder="학습자 이름을 입력하세요" onkeypress="if(event.keyCode==13) login()">
-        <button id="login-btn" onclick="login()" style="width:100%; background:#007acc; color:white; border:none; padding:12px; cursor:pointer; font-weight:bold; border-radius:4px; margin-top:15px;">학습 시작</button>
+        <!-- 입력창과 버튼의 사이즈 일치 -->
+        <input type="text" id="user-name" class="admin-input" style="width:100%; padding:12px; box-sizing:border-box;" placeholder="학생 이름 입력" onkeypress="if(event.keyCode==13) login()">
+        <button onclick="login()" style="width:100%; background:#007acc; color:white; border:none; padding:12px; cursor:pointer; font-weight:bold; border-radius:4px; margin-top:5px;">학습 시작</button>
     </div>
 </div>
 
@@ -87,12 +100,18 @@
     <div class="activity-bar">
         <div style="text-align: center;"><i class="fas fa-code" style="color:white; font-size: 22px; margin-bottom: 25px;"></i><div id="user-display" style="font-size: 10px; color: #28a745; font-weight: bold; writing-mode: vertical-lr;">USER</div></div>
         <div>
-            <div id="sync-icon"><i class="fas fa-check-circle" style="color:#28a745; margin-bottom: 25px;"></i></div>
-            <div onclick="logout()" title="초기화 후 로그아웃"><i class="fas fa-sign-out-alt" style="color:#555; cursor:pointer;"></i></div>
+            <div id="sync-icon" title="Cloud Sync OK"><i class="fas fa-check-circle" style="color:#28a745; margin-bottom: 25px;"></i></div>
+            <div onclick="askPw('dashboard')" title="성취도 대시보드"><i class="fas fa-chart-line" style="color:#888; margin-bottom: 25px; cursor:pointer;"></i></div>
+            <div onclick="askPw('admin')" title="마스터 센터"><i class="fas fa-tasks" style="color:#888; margin-bottom: 25px; cursor:pointer;"></i></div>
+            <div onclick="location.reload()" title="로그아웃 및 초기화"><i class="fas fa-sign-out-alt" style="color:#555; cursor:pointer;"></i></div>
         </div>
     </div>
     <div class="explorer">
-        <div style="padding: 15px 20px; font-size: 11px; color: #888; font-weight: bold;">EXPLORER</div>
+        <!-- Explorer 헤더에 새로고침 버튼 추가 -->
+        <div style="padding: 15px 20px; display: flex; justify-content: space-between; align-items: center;">
+            <div style="font-size: 11px; color: #888; font-weight: bold;">EXPLORER</div>
+            <i class="fas fa-sync-alt" style="font-size: 10px; color: #555; cursor: pointer;" onclick="location.reload()" title="새로고침"></i>
+        </div>
         <div id="accordion-root" style="flex: 1; overflow-y: auto;"></div>
         <div id="progress-stats" style="padding: 15px 20px; font-size: 12px; color: #28a745; border-top: 1px solid #333; font-weight:bold;">성취도: 0%</div>
     </div>
@@ -114,16 +133,35 @@
     </div>
 </div>
 
-<script>
-    // [핵심 수정] F5를 누를 때마다 로그인을 새롭게 하기 위해 세션을 초기화함
-    localStorage.removeItem('coden_user_v81'); 
+<!-- 마스터 센터 (v8.1 복구) -->
+<div id="admin-panel" class="floating-panel">
+    <div style="display:flex; justify-content:space-between; margin-bottom:15px;"><h3>마스터 센터</h3><button onclick="closePanels()">닫기</button></div>
+    <div style="flex:1; overflow-y:auto;">
+        <table class="master-table">
+            <thead><tr style="background:#333;"><th>ID</th><th>분류</th><th>제목</th><th>정답</th></tr></thead>
+            <tbody id="admin-prob-body"></tbody>
+        </table>
+    </div>
+</div>
 
+<!-- 대시보드 (v8.1 복구) -->
+<div id="dashboard-panel" class="floating-panel">
+    <div style="display:flex; justify-content:space-between; margin-bottom:15px;"><h3>학급 성취도 리포트</h3><button onclick="closePanels()">닫기</button></div>
+    <div style="flex:1; overflow-y:auto;">
+        <table class="master-table">
+            <thead><tr style="background:#333;"><th>학생명</th><th>진척률</th><th>리포트</th></tr></thead>
+            <tbody id="stats-body"></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
     const MASTER_CLOUD_URL = "https://script.google.com/macros/s/AKfycbxECzN-NGJWsrx466aoGcodQICqQY2UeNVBJ4_CR8gyxi2TerpznaZAX7xCLw530Yk1/exec";
     const GITHUB_USER = "kssim00", GITHUB_REPO = "python-test-V2", ADMIN_PW = "1234";
 
     let problems = [], solvedIds = [], currentIdx = -1, pyodide, editor, isDragging = false;
-    let currentUser = ""; // 세션 기반으로 동작
-    let openMainCats = [], openSubCats = [];
+    let currentUser = "";
+    let openMainCats = [], openSubCats = [], targetMode = "";
 
     function smartFormatDesc(text) {
         if (!text) return "";
@@ -142,51 +180,47 @@
         return html;
     }
 
-    function log(m) { document.getElementById('debug-msg').innerText = m; }
-
     async function initApp() {
-        // currentUser가 비어있으므로 항상 로그인 창 노출
-        document.getElementById('loader').style.display='none'; 
-        document.getElementById('login-screen').style.display='flex';
+        // 모나코 경로 에러 완벽 해결 로직 포함
+        require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.36.1/min/vs' }});
+        require(['vs/editor/editor.main'], async function() {
+            editor = monaco.editor.create(document.getElementById('editor-container'), { 
+                value: "", language: 'python', theme: 'vs-dark', fontSize: 16, automaticLayout: true, minimap: { enabled: false }
+            });
+            pyodide = await loadPyodide();
+            document.getElementById('loader').style.display='none';
+        });
     }
 
-    async function startLearning(userName) {
-        currentUser = userName;
+    async function login() {
+        const n = document.getElementById('user-name').value.trim();
+        if(!n) return;
+        currentUser = n;
         document.getElementById('login-screen').style.display='none';
         document.getElementById('loader').style.display='flex';
-        
+
         try {
-            log("1. GitHub 문제 로드 중...");
+            // [중요] 스프레드 시트 + 깃허브 하이브리드 로딩
+            const sheetRes = await fetch(`${MASTER_CLOUD_URL}?action=getProblems`);
+            const sheetProbs = await sheetRes.json();
+            
             const filesRes = await fetch(`https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/`);
             const files = await filesRes.json();
             const jsonUrls = files.filter(f => f.name.endsWith('.json')).map(f => f.download_url);
-            let combined = [];
-            for(let url of jsonUrls) { combined = [...combined, ...(await (await fetch(url)).json())]; }
-            problems = combined.map((p, i) => ({ id: 80000 + i, ...p }));
+            let githubProbs = [];
+            for(let url of jsonUrls) { githubProbs = [...githubProbs, ...(await (await fetch(url)).json())]; }
+            
+            problems = [...sheetProbs, ...githubProbs].map((p, i) => ({ id: 80000 + i, ...p }));
 
-            log("2. 클라우드 기록 동기화 중...");
             const sRes = await fetch(`${MASTER_CLOUD_URL}?action=getSolved&name=${encodeURIComponent(currentUser)}`);
             solvedIds = (await sRes.json()).map(id => parseInt(id));
 
-            log("3. 에디터 리소스 로드 중...");
-            require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.36.1/min/vs' }});
-            require(['vs/editor/editor.main'], async function() {
-                editor = monaco.editor.create(document.getElementById('editor-container'), { 
-                    value: "", language: 'python', theme: 'vs-dark', fontSize: 16, automaticLayout: true, minimap: { enabled: false }
-                });
-                
-                document.getElementById('loader').style.display = 'none'; 
-                document.getElementById('main-app').style.display = 'flex';
-                document.getElementById('user-display').innerText = currentUser;
-                renderList(); 
-                initResizing();
-                if(problems.length > 0) loadProblem(problems[0].id);
-
-                log("4. 엔진 준비 중...");
-                pyodide = await loadPyodide();
-                document.getElementById('run-btn').classList.add('ready');
-                document.getElementById('output').innerText = "엔진 준비 완료.";
-            });
+            document.getElementById('loader').style.display = 'none'; 
+            document.getElementById('main-app').style.display = 'flex';
+            document.getElementById('user-display').innerText = currentUser;
+            renderList(); 
+            initResizing();
+            if(problems.length > 0) loadProblem(problems[0].id);
         } catch(e) { console.error(e); }
     }
 
@@ -229,24 +263,26 @@
                         tree[m][s].forEach(p => {
                             let pDiv = document.createElement('div'); 
                             pDiv.className=`prob-item ${currentIdx==p.id?'active':''} ${solvedIds.includes(p.id)?'solved':''}`;
-                            pDiv.innerText = p.title; pDiv.onclick=()=>loadProblem(p.id); root.appendChild(pDiv);
+                            pDiv.innerText = (solvedIds.includes(p.id)?'✔ ':'') + p.title; 
+                            pDiv.onclick=()=>loadProblem(p.id); root.appendChild(pDiv);
                         });
                     }
                 }
             }
         }
+        document.getElementById('progress-stats').innerText = `성취도: ${problems.length?Math.floor((solvedIds.length/problems.length)*100):0}% (${solvedIds.length}/${problems.length})`;
     }
 
     function loadProblem(id) {
         const p = problems.find(x => x.id === id); if(!p) return;
         currentIdx = id; renderList();
+        document.getElementById('output').innerText = "코드를 실행하세요.";
         document.getElementById('prob-title').innerText = p.title;
         document.getElementById('prob-desc-container').innerHTML = smartFormatDesc(p.desc);
-        editor.setValue(p.initial || ""); // 자동 저장 코드 대신 초기 코드를 강제 로드하여 초기화 지원
+        editor.setValue(p.initial || "");
     }
 
     async function runCode() {
-        if(!pyodide) return;
         const p = problems.find(x => x.id === currentIdx);
         try {
             await pyodide.runPythonAsync(`import sys, io\nsys.stdout = io.StringIO()`);
@@ -254,16 +290,48 @@
             const res = pyodide.runPython("sys.stdout.getvalue()").trim();
             document.getElementById('output').innerText = res;
             if(res === p.expected.toString().trim()) {
-                document.getElementById('output').innerHTML += "\n\n<b style='color: yellow;'>🎉 정답!</b>";
+                document.getElementById('output').innerHTML += "\n\n<b style='color: yellow;'>🎉 정답입니다!</b>";
                 fetch(`${MASTER_CLOUD_URL}?action=save&name=${encodeURIComponent(currentUser)}&id=${p.id}`);
                 if(!solvedIds.includes(p.id)) { solvedIds.push(p.id); renderList(); }
-                confetti({ particleCount: 80, spread: 60, origin: { y: 0.7 } });
+                confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
             }
         } catch(e) { document.getElementById('output').innerText = "에러: " + e.message; }
     }
 
-    function login() { const n = document.getElementById('user-name').value.trim(); if(n) startLearning(n); }
-    function logout() { location.reload(); }
+    // 관리자 마스터 기능 복구
+    function askPw(mode) { targetMode = mode; document.getElementById('pw-modal').style.display = 'flex'; document.getElementById('pw-input').focus(); }
+    function checkPw() {
+        const i = document.getElementById('pw-input');
+        if(i.value === ADMIN_PW) { 
+            i.value = ""; closePanels(); 
+            if(targetMode === 'dashboard') showStats();
+            else showMaster();
+        } else { i.value = ""; }
+    }
+
+    async function showStats() {
+        document.getElementById('dashboard-panel').style.display = 'block';
+        const body = document.getElementById('stats-body'); body.innerHTML = "조회 중...";
+        const res = await fetch(`${MASTER_CLOUD_URL}?action=stats`);
+        const data = await res.json();
+        const stats = {}; data.forEach(row => { if(!stats[row[1]]) stats[row[1]] = new Set(); stats[row[1]].add(row[2]); });
+        body.innerHTML = "";
+        Object.keys(stats).forEach(n => {
+            const cnt = stats[n].size;
+            body.innerHTML += `<tr><td>${n}</td><td>${Math.floor((cnt/problems.length)*100)}%</td><td><i class="fas fa-file-invoice" style="cursor:pointer;" onclick="alert('${n} 리포트 생성')"></i></td></tr>`;
+        });
+    }
+
+    function showMaster() {
+        document.getElementById('admin-panel').style.display = 'block';
+        const body = document.getElementById('admin-prob-body');
+        body.innerHTML = "";
+        problems.forEach(p => {
+            body.innerHTML += `<tr><td>${p.id}</td><td>${p.subCat}</td><td>${p.title}</td><td>${p.expected}</td></tr>`;
+        });
+    }
+
+    function closePanels() { document.querySelectorAll('.custom-modal, .floating-panel').forEach(p=>p.style.display='none'); }
 
     initApp();
 </script>
