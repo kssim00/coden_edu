@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>코드:앤 파이썬 스튜디오 (v9.8 - Full Fixed)</title>
+    <title>코드:앤 파이썬 스튜디오 (v9.8 - Final Edition)</title>
     <!-- 라이브러리 로드 -->
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.36.1/min/vs/loader.min.js"></script>
@@ -76,7 +76,7 @@
 <body onselectstart="return !isDragging">
 
 <script>localStorage.removeItem('coden_user_v81');</script>
-<div id="loader" class="overlay"><div class="spinner"></div><b id="loader-msg">데이터 및 엔진 로드 중...</b></div>
+<div id="loader" class="overlay"><div class="spinner"></div><b id="loader-msg">데이터 및 엔진 동기화 중...</b></div>
 
 <!-- 관리자 인증 모달 -->
 <div id="pw-modal" class="custom-modal" onclick="if(event.target == this) closePanels()">
@@ -185,7 +185,7 @@
     let currentUser = "";
     let openMainCats = [], openSubCats = [], targetMode = "";
 
-    // 앱 초기화 및 엔진 로드
+    // 앱 초기화 및 엔진 로드 (indexURL 추가로 에러 방지)
     async function initApp() {
         require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.36.1/min/vs' }});
         require(['vs/editor/editor.main'], async function() {
@@ -193,9 +193,7 @@
                 value: "", language: 'python', theme: 'vs-dark', fontSize: 16, automaticLayout: true, minimap: { enabled: false }
             });
             try {
-                // indexURL을 명시하여 wasm 로딩 에러 방지
                 pyodide = await loadPyodide({ indexURL: "https://cdn.jsdelivr.net/pyodide/v0.25.0/full/" });
-                console.log("Pyodide Ready");
             } catch(e) {
                 console.error(e);
                 document.getElementById('loader-msg').innerText = "엔진 로드 실패 (새로고침 하세요)";
@@ -204,7 +202,7 @@
         });
     }
 
-    // 깃허브 및 서버 동기화
+    // 깃허브 실시간 동기화
     async function refreshData() {
         const icon = document.getElementById('explorer-refresh-icon');
         if(icon) icon.classList.add('fa-spin');
@@ -239,7 +237,6 @@
         } catch(e) { console.error(e); }
     }
 
-    // [기능] 리사이징
     function initResizing() {
         const h = document.getElementById('resizer-h'), v = document.getElementById('resizer-v'), pD = document.getElementById('panel-desc'), pT = document.getElementById('panel-terminal');
         h.onmousedown = (e) => { 
@@ -262,7 +259,6 @@
         };
     }
 
-    // [기능] 문제 목록 렌더링
     function renderList() {
         const root = document.getElementById('accordion-root'); root.innerHTML = "";
         const tree = {};
@@ -303,7 +299,7 @@
         editor.setValue(p.initial || "");
     }
 
-    // [기능] 파이썬 코드 실행
+    // [기능] 파이썬 실행 및 폭죽 효과
     async function runCode() {
         if(!pyodide) { alert("엔진 로딩 중입니다."); return; }
         const p = problems.find(x => x.id === currentIdx);
@@ -312,16 +308,27 @@
             await pyodide.runPythonAsync(editor.getValue());
             const res = pyodide.runPython("sys.stdout.getvalue()").trim();
             document.getElementById('output').innerText = res;
+            
+            // 정답 비교
             if(res === p.expected.toString().trim()) {
                 document.getElementById('output').innerHTML += "\n\n<b style='color: yellow;'>🎉 정답입니다!</b>";
+                
+                // 폭죽 팡팡! (Confetti)
+                confetti({
+                    particleCount: 150,
+                    spread: 80,
+                    origin: { y: 0.6 },
+                    colors: ['#28a745', '#ffffff', '#007acc', '#ffcc00']
+                });
+
+                // 서버에 결과 저장
                 fetch(`${MASTER_CLOUD_URL}?action=save&name=${encodeURIComponent(currentUser)}&id=${p.id}`);
                 if(!solvedIds.includes(p.id)) { solvedIds.push(p.id); renderList(); }
-                confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
             }
         } catch(e) { document.getElementById('output').innerText = "에러: " + e.message; }
     }
 
-    // [관리자] 패스워드 체크
+    // [관리자] 기능
     function askPw(mode) { targetMode = mode; document.getElementById('pw-modal').style.display = 'flex'; document.getElementById('pw-input').focus(); }
     function checkPw() {
         const i = document.getElementById('pw-input');
@@ -332,7 +339,6 @@
         } else { i.value = ""; alert("비밀번호 불일치"); }
     }
 
-    // [관리자] 성취도 대시보드
     async function showStats() {
         document.getElementById('dashboard-panel').style.display = 'block';
         const body = document.getElementById('stats-body'); body.innerHTML = "조회 중...";
@@ -346,7 +352,6 @@
         });
     }
 
-    // [관리자] 문제 관리 (순서, 카테고리)
     function renderSortManager() {
         const b = document.getElementById('sort-body'); b.innerHTML = "";
         problems.forEach((p, i) => {
@@ -389,7 +394,6 @@
     function exportJson() { const data = JSON.stringify(problems.map(({id, ...rest})=>rest), null, 2); document.getElementById('test-json-input').value = data; alert("추출됨"); }
     function closePanels() { document.querySelectorAll('.custom-modal, .floating-panel').forEach(p=>p.style.display='none'); }
 
-    // 지문 포맷팅 함수
     function smartFormatDesc(text) {
         if (!text) return "";
         let html = "", isExample = false;
