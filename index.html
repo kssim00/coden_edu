@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>코드:앤 파이썬 스튜디오 (v9.9 - Pro Edition)</title>
+    <title>코드:앤 파이썬 스튜디오 (v10.0 - Ultimate Edition)</title>
     <!-- 라이브러리 로드 -->
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.36.1/min/vs/loader.min.js"></script>
@@ -28,7 +28,8 @@
         .modal-box { background: #252526; padding: 30px; border-radius: 12px; border: 1px solid #444; width: 320px; text-align: center; box-shadow: 0 10px 50px rgba(0,0,0,1); }
 
         .activity-bar { width: 50px; background: #333; display: flex; flex-direction: column; align-items: center; padding: 20px 0; justify-content: space-between; flex-shrink: 0; }
-        .explorer { width: 250px; min-width: 100px; background: var(--vscode-side); border-right: 1px solid #333; display: flex; flex-direction: column; flex-shrink: 0; }
+        /* 카테고리 영역 초기 너비 180px로 조정 */
+        .explorer { width: 180px; min-width: 80px; background: var(--vscode-side); border-right: 1px solid #333; display: flex; flex-direction: column; flex-shrink: 0; }
         .main-content { flex: 1; display: flex; overflow: hidden; position: relative; }
         
         .description-panel { width: 400px; min-width: 150px; padding: 25px; border-right: 1px solid #333; background: #1e1e1e; overflow-y: auto; flex-shrink: 0; box-sizing: border-box; }
@@ -38,10 +39,7 @@
         
         .description-panel table { width: 100%; border-collapse: collapse; margin: 15px 0; border: 1px solid #444; background: #252526; }
         .description-panel th, .description-panel td { border: 1px solid #444; padding: 10px; text-align: center; font-size: 14px; }
-        .bg-yellow { background-color: #f1c40f !important; color: black !important; font-weight: bold; }
-        .bg-blue { background-color: #3498db !important; color: white !important; }
 
-        /* 리사이저 스타일 */
         .resizer-h { width: 8px; cursor: col-resize; background: transparent; z-index: 50; margin: 0 -4px; }
         .resizer-h:hover { background: rgba(0, 122, 204, 0.4); }
         .resizer-v { height: 10px; cursor: row-resize; background: transparent; z-index: 60; margin: -5px 0; position: relative; }
@@ -54,42 +52,40 @@
         
         .btn-run { position: absolute; right: 25px; top: 15px; z-index: 100; background: #28a745; color: white; border: none; padding: 8px 20px; cursor: pointer; font-weight: bold; border-radius: 4px; }
 
-        .main-cat-header { padding: 12px 15px; font-size: 12px; font-weight: bold; color: #fff; background: #37373d; cursor: pointer; border-bottom: 1px solid #222; }
-        .sub-cat-header { padding: 10px 15px 10px 30px; font-size: 12px; font-weight: bold; color: #999; background: #2d2d2d; cursor: pointer; border-bottom: 1px solid #222; }
-        .prob-item { padding: 8px 15px 8px 50px; cursor: pointer; font-size: 13px; color: #aaa; border-bottom: 1px solid #282828; }
+        .main-cat-header { padding: 12px 15px; font-size: 12px; font-weight: bold; color: #fff; background: #37373d; cursor: pointer; border-bottom: 1px solid #222; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .sub-cat-header { padding: 10px 15px 10px 25px; font-size: 11px; font-weight: bold; color: #999; background: #2d2d2d; cursor: pointer; border-bottom: 1px solid #222; }
+        .prob-item { padding: 8px 15px 8px 40px; cursor: pointer; font-size: 12px; color: #aaa; border-bottom: 1px solid #282828; }
         
         .prob-item.active { color: #ffffff !important; background-color: #094771 !important; font-weight: bold; }
         .prob-item.solved { color: #28a745; font-weight: bold; }
-        .prob-item.solved.active { background-color: #094771 !important; color: #28a745 !important; }
 
-        /* 관리자 패널 스타일 */
+        /* 관리자 패널 */
         .floating-panel { display: none; position: fixed; top: 20px; left: 60px; right: 20px; bottom: 20px; background: #252526; border: 1px solid #444; border-radius: 12px; z-index: 1000; padding: 25px; overflow: hidden; }
         .admin-flex { display: flex; gap: 20px; height: calc(100% - 60px); }
         .admin-col { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: #111; padding: 15px; border-radius: 8px; }
         .master-table { width: 100%; border-collapse: collapse; color: #ddd; font-size: 12px; }
         .master-table th, .master-table td { padding: 8px; border: 1px solid #333; text-align: center; }
         .admin-input { background: #3c3c3c; border: 1px solid #555; color: white; padding: 10px; width: 100%; border-radius: 4px; margin-bottom: 10px; }
-        .btn-mini { padding: 4px 6px; border-radius: 3px; border: none; cursor: pointer; font-size: 10px; color: white; margin: 0 2px; }
         .tab-btn { background: none; border: none; color: #666; cursor: pointer; font-weight: bold; font-size: 13px; padding-bottom: 8px; margin-right: 10px; }
         .tab-btn.active { color: var(--vscode-accent); border-bottom: 2px solid var(--vscode-accent); }
 
-        /* 리포트 전용 스타일 */
-        #report-view { display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); width:400px; height:500px; background:#252526; border:1px solid #444; border-radius:12px; z-index:11000; padding:20px; flex-direction:column; }
+        /* 업그레이드된 리포트 UI */
+        #report-view { display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); width:480px; height:650px; background:#1e1e1e; border:1px solid #444; border-radius:15px; z-index:11000; padding:30px; flex-direction:column; box-shadow: 0 20px 80px rgba(0,0,0,0.8); }
+        .report-header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:20px; }
+        .report-card { background:#2d2d2d; padding:20px; border-radius:12px; margin-bottom:20px; border:1px solid #444; }
+        .progress-container { height:10px; background:#444; border-radius:5px; margin:10px 0; overflow:hidden; }
+        .progress-bar { height:100%; background:linear-gradient(90deg, #28a745, #85d996); transition: width 0.5s ease-in-out; }
+        .badge { padding:3px 8px; border-radius:4px; font-size:10px; font-weight:bold; }
+        .badge-solved { background:rgba(40, 167, 69, 0.2); color:#28a745; }
+        .badge-pending { background:rgba(255, 255, 255, 0.1); color:#888; }
     </style>
 </head>
 <body onselectstart="return !isDragging">
 
 <script>localStorage.removeItem('coden_user_v81');</script>
-<div id="loader" class="overlay"><div class="spinner"></div><b id="loader-msg">데이터 연동 및 엔진 로드 중...</b></div>
+<div id="loader" class="overlay"><div class="spinner"></div><b id="loader-msg">데이터 및 파이썬 엔진 준비 중...</b></div>
 
-<!-- 관리자 인증 모달 -->
-<div id="pw-modal" class="custom-modal" onclick="if(event.target == this) closePanels()">
-    <div class="modal-box" onclick="event.stopPropagation()">
-        <h3 id="modal-title" style="color:white; margin-bottom:20px; margin-top:0;">관리자 인증</h3>
-        <input type="password" id="pw-input" class="admin-input" style="width:100%; padding:12px; box-sizing:border-box; font-size:20px; letter-spacing:5px; text-align:center;" placeholder="····" onkeypress="if(event.keyCode==13) checkPw()">
-    </div>
-</div>
-
+<!-- 로그인 화면 -->
 <div id="login-screen" class="overlay">
     <div style="background:#252526; padding:40px; border-radius:15px; width:300px; text-align:center; border:1px solid #444;">
         <h2 style="color:white; margin-bottom:20px;">코드:앤 파이썬 스튜디오</h2>
@@ -98,6 +94,7 @@
     </div>
 </div>
 
+<!-- 앱 인터페이스 -->
 <div class="app-wrapper" id="main-app">
     <div class="activity-bar">
         <div style="text-align: center;"><i class="fas fa-code" style="color:white; font-size: 22px; margin-bottom: 25px;"></i><div id="user-display" style="font-size: 10px; color: #28a745; font-weight: bold; writing-mode: vertical-lr;">USER</div></div>
@@ -108,21 +105,26 @@
             <div onclick="location.reload()" title="로그아웃 및 초기화"><i class="fas fa-sign-out-alt" style="color:#555; cursor:pointer;"></i></div>
         </div>
     </div>
+    <!-- 탐색기 영역 -->
     <div class="explorer" id="panel-explorer">
         <div style="padding: 15px 20px; display: flex; justify-content: space-between; align-items: center;">
-            <div style="font-size: 11px; color: #888; font-weight: bold;">EXPLORER</div>
+            <div style="font-size: 10px; color: #888; font-weight: bold;">EXPLORER</div>
             <i id="explorer-refresh-icon" class="fas fa-sync-alt" style="font-size: 10px; color: #555; cursor: pointer;" onclick="refreshData()" title="문제 새로고침"></i>
         </div>
         <div id="accordion-root" style="flex: 1; overflow-y: auto;"></div>
-        <div id="progress-stats" style="padding: 15px 20px; font-size: 12px; color: #28a745; border-top: 1px solid #333; font-weight:bold;">성취도: 0%</div>
+        <div id="progress-stats" style="padding: 15px 20px; font-size: 11px; color: #28a745; border-top: 1px solid #333; font-weight:bold;">성취도: 0%</div>
     </div>
-    <div class="resizer-h" id="resizer-explorer"></div> <!-- 탐색기 리사이저 추가 -->
+    <div class="resizer-h" id="resizer-explorer"></div>
+
     <div class="main-content">
+        <!-- 지문 영역 -->
         <div class="description-panel" id="panel-desc">
-            <h2 id="prob-title" style="margin: 0 0 20px 0; color: white;">문제를 선택하세요</h2>
+            <h2 id="prob-title" style="margin: 0 0 20px 0; color: white; font-size:18px;">문제를 선택하세요</h2>
             <div id="prob-desc-container"></div>
         </div>
         <div class="resizer-h" id="resizer-h"></div>
+        
+        <!-- 에디터 및 콘솔 영역 -->
         <div class="editor-section">
             <button id="run-btn" class="btn-run" onclick="runCode()"><i class="fas fa-play"></i> RUN</button>
             <div id="editor-container"></div>
@@ -135,7 +137,15 @@
     </div>
 </div>
 
-<!-- 마스터 센터 -->
+<!-- 관리자 인증 모달 -->
+<div id="pw-modal" class="custom-modal" onclick="if(event.target == this) closePanels()">
+    <div class="modal-box" onclick="event.stopPropagation()">
+        <h3 style="color:white; margin-bottom:20px; margin-top:0;">관리자 인증</h3>
+        <input type="password" id="pw-input" class="admin-input" style="width:100%; padding:12px; box-sizing:border-box; font-size:20px; letter-spacing:5px; text-align:center;" placeholder="····" onkeypress="if(event.keyCode==13) checkPw()">
+    </div>
+</div>
+
+<!-- 마스터 센터 (관리자 패널) -->
 <div id="admin-panel" class="floating-panel">
     <div style="display:flex; justify-content:space-between; margin-bottom:15px;"><h2>마스터 센터</h2><button onclick="closePanels()">닫기</button></div>
     <div class="admin-flex">
@@ -171,7 +181,7 @@
     </div>
 </div>
 
-<!-- 대시보드 -->
+<!-- 대시보드 패널 -->
 <div id="dashboard-panel" class="floating-panel">
     <div style="display:flex; justify-content:space-between; margin-bottom:15px;"><h3>학급 성취도 리포트</h3><button onclick="closePanels()">닫기</button></div>
     <div style="flex:1; overflow-y:auto;">
@@ -182,13 +192,27 @@
     </div>
 </div>
 
-<!-- 학생 상세 리포트 팝업 -->
+<!-- 업그레이드된 학생 리포트 모달 -->
 <div id="report-view">
-    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #444; padding-bottom:10px; margin-bottom:10px;">
-        <h4 id="report-user-name" style="margin:0; color:#28a745;">학생 리포트</h4>
-        <i class="fas fa-times" style="cursor:pointer;" onclick="document.getElementById('report-view').style.display='none'"></i>
+    <div class="report-header">
+        <div>
+            <div id="report-user-name" style="font-size:24px; font-weight:bold; color:#fff;">학생 리포트</div>
+            <div style="font-size:14px; color:#888;">Student Performance Analytics</div>
+        </div>
+        <i class="fas fa-times" style="cursor:pointer; font-size:20px; color:#555;" onclick="document.getElementById('report-view').style.display='none'"></i>
     </div>
-    <div id="report-content" style="flex:1; overflow-y:auto; font-size:13px; color:#ccc;"></div>
+    
+    <div id="report-summary-card" class="report-card">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-weight:bold; color:#28a745;">전체 완성도</span>
+            <span id="report-total-percent" style="font-size:20px; font-weight:bold; color:#fff;">0%</span>
+        </div>
+        <div class="progress-container"><div id="report-total-bar" class="progress-bar" style="width: 0%;"></div></div>
+        <div id="report-total-count" style="font-size:12px; color:#888; margin-top:5px;">0 / 0 Problems Solved</div>
+    </div>
+
+    <div style="font-size:13px; font-weight:bold; color:#aaa; margin-bottom:10px;">카테고리별 성취도</div>
+    <div id="report-category-stats" style="flex:1; overflow-y:auto; padding-right:5px;"></div>
 </div>
 
 <script>
@@ -198,8 +222,9 @@
     let problems = [], solvedIds = [], currentIdx = -1, pyodide, editor, isDragging = false;
     let currentUser = "";
     let openMainCats = [], openSubCats = [], targetMode = "";
-    let allStatsData = []; // 리포트 조회를 위해 전체 통계 데이터 저장
+    let allStatsData = [];
 
+    // [기본] 앱 초기화
     async function initApp() {
         require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.36.1/min/vs' }});
         require(['vs/editor/editor.main'], async function() {
@@ -213,6 +238,7 @@
         });
     }
 
+    // [기본] 데이터 동기화 (기능 유지)
     async function refreshData() {
         const icon = document.getElementById('explorer-refresh-icon');
         if(icon) icon.classList.add('fa-spin');
@@ -247,49 +273,43 @@
         } catch(e) { console.error(e); }
     }
 
-    // 리사이징 기능 (탐색기 포함)
+    // [개선] 리사이징 (탐색기 180px 시작 및 조절 기능 유지)
     function initResizing() {
-        const hExp = document.getElementById('resizer-explorer'), 
-              hDesc = document.getElementById('resizer-h'), 
-              vTerm = document.getElementById('resizer-v'),
-              pExp = document.getElementById('panel-explorer'),
-              pDesc = document.getElementById('panel-desc'),
-              pTerm = document.getElementById('panel-terminal');
+        const hExp = document.getElementById('resizer-explorer'), hDesc = document.getElementById('resizer-h'), vTerm = document.getElementById('resizer-v');
+        const pExp = document.getElementById('panel-explorer'), pDesc = document.getElementById('panel-desc'), pTerm = document.getElementById('panel-terminal');
 
-        // 탐색기 너비 조절
         hExp.onmousedown = (e) => {
             isDragging = true;
-            const moveExp = (ev) => {
-                let w = ev.clientX - 50; // 사이드바 50px 제외
-                if (w > 100 && w < 600) { pExp.style.width = w + "px"; editor.layout(); }
+            const move = (ev) => {
+                let w = ev.clientX - 50; 
+                if (w > 80 && w < 500) { pExp.style.width = w + "px"; editor.layout(); }
             };
-            const upExp = () => { isDragging = false; window.removeEventListener('mousemove', moveExp); };
-            window.addEventListener('mousemove', moveExp); window.addEventListener('mouseup', upExp);
+            const up = () => { isDragging = false; window.removeEventListener('mousemove', move); };
+            window.addEventListener('mousemove', move); window.addEventListener('mouseup', up);
         };
 
-        // 지문 영역 너비 조절
         hDesc.onmousedown = (e) => { 
             isDragging = true; 
-            const moveH = (ev) => {
+            const move = (ev) => {
                 let w = ev.clientX - pExp.offsetWidth - 58; 
                 if (w > 150 && w < window.innerWidth - 400) { pDesc.style.width = w + "px"; editor.layout(); }
             };
-            const upH = () => { isDragging = false; window.removeEventListener('mousemove', moveH); };
-            window.addEventListener('mousemove', moveH); window.addEventListener('mouseup', upH);
+            const up = () => { isDragging = false; window.removeEventListener('mousemove', move); };
+            window.addEventListener('mousemove', move); window.addEventListener('mouseup', up);
         };
 
-        // 터미널 높이 조절
         vTerm.onmousedown = (e) => { 
             isDragging = true; 
-            const moveV = (ev) => {
+            const move = (ev) => {
                 let h = window.innerHeight - ev.clientY;
                 if (h > 35 && h < window.innerHeight - 150) { pTerm.style.height = h + "px"; editor.layout(); }
             };
-            const upV = () => { isDragging = false; window.removeEventListener('mousemove', moveV); };
-            window.addEventListener('mousemove', moveV); window.addEventListener('mouseup', upV);
+            const up = () => { isDragging = false; window.removeEventListener('mousemove', move); };
+            window.addEventListener('mousemove', move); window.addEventListener('mouseup', up);
         };
     }
 
+    // [기본] 문제 로드 및 리스트 (기능 유지)
     function renderList() {
         const root = document.getElementById('accordion-root'); root.innerHTML = "";
         const tree = {};
@@ -347,6 +367,7 @@
         } catch(e) { document.getElementById('output').innerText = "에러: " + e.message; }
     }
 
+    // [관리자] 기능 유지
     function askPw(mode) { targetMode = mode; document.getElementById('pw-modal').style.display = 'flex'; document.getElementById('pw-input').focus(); }
     function checkPw() {
         const i = document.getElementById('pw-input');
@@ -357,49 +378,67 @@
         } else { i.value = ""; alert("비밀번호 오류"); }
     }
 
-    // 대시보드 통계 조회
     async function showStats() {
         document.getElementById('dashboard-panel').style.display = 'block';
         const body = document.getElementById('stats-body'); body.innerHTML = "조회 중...";
         const res = await fetch(`${MASTER_CLOUD_URL}?action=stats`);
         allStatsData = await res.json();
         const stats = {}; 
-        allStatsData.forEach(row => { 
-            if(!stats[row[1]]) stats[row[1]] = new Set(); 
-            stats[row[1]].add(row[2]); 
-        });
+        allStatsData.forEach(row => { if(!stats[row[1]]) stats[row[1]] = new Set(); stats[row[1]].add(row[2]); });
         body.innerHTML = "";
         Object.keys(stats).forEach(n => {
             const cnt = stats[n].size;
-            body.innerHTML += `<tr><td>${n}</td><td>${Math.floor((cnt/problems.length)*100)}%</td><td><i class="fas fa-file-invoice" style="cursor:pointer; color:#007acc;" onclick="openDetailReport('${n}')"></i></td></tr>`;
+            body.innerHTML += `<tr><td>${n}</td><td>${Math.floor((cnt/problems.length)*100)}%</td><td><i class="fas fa-chart-pie" style="cursor:pointer; color:#007acc;" onclick="openDetailReport('${n}')"></i></td></tr>`;
         });
     }
 
-    // 상세 리포트 생성 및 표시
+    // [개선] 학생 리포트 업그레이드 (차트형 및 상세 통계)
     function openDetailReport(name) {
-        const reportModal = document.getElementById('report-view');
-        const reportContent = document.getElementById('report-content');
-        const reportUser = document.getElementById('report-user-name');
+        document.getElementById('report-view').style.display = 'flex';
+        document.getElementById('report-user-name').innerText = name;
         
-        reportUser.innerText = `[${name}] 학습 리포트`;
-        reportModal.style.display = 'flex';
+        const mySolved = allStatsData.filter(r => r[1] === name).map(r => parseInt(r[2]));
+        const total = problems.length;
+        const percent = Math.floor((mySolved.length / total) * 100);
         
-        // 해당 학생이 푼 문제 ID 추출
-        const studentSolvedIds = allStatsData.filter(r => r[1] === name).map(r => parseInt(r[2]));
-        
-        let html = `<div style="margin-bottom:15px; background:#111; padding:10px; border-radius:5px;"><b>총 완료: ${studentSolvedIds.length} / ${problems.length}</b></div>`;
-        
+        document.getElementById('report-total-percent').innerText = percent + "%";
+        document.getElementById('report-total-bar').style.width = percent + "%";
+        document.getElementById('report-total-count').innerText = `${mySolved.length} / ${total} Problems Solved`;
+
+        // 카테고리별 계산
+        const catStats = {};
         problems.forEach(p => {
-            const isSolved = studentSolvedIds.includes(p.id);
-            html += `<div style="padding:5px 0; border-bottom:1px solid #333; display:flex; justify-content:space-between;">
-                        <span>${p.title}</span>
-                        <span style="color:${isSolved?'#28a745':'#555'}">${isSolved?'완료':'미완료'}</span>
-                     </div>`;
+            if(!catStats[p.mainCat]) catStats[p.mainCat] = { total: 0, solved: 0 };
+            catStats[p.mainCat].total++;
+            if(mySolved.includes(p.id)) catStats[p.mainCat].solved++;
         });
+
+        let html = "";
+        for(let cat in catStats) {
+            const cp = Math.floor((catStats[cat].solved / catStats[cat].total) * 100);
+            html += `<div style="margin-bottom:15px;">
+                <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:5px;">
+                    <span style="color:#eee;">${cat}</span>
+                    <span style="color:#28a745; font-weight:bold;">${catStats[cat].solved}/${catStats[cat].total}</span>
+                </div>
+                <div class="progress-container" style="height:6px;"><div class="progress-bar" style="width:${cp}%; background:#007acc;"></div></div>
+            </div>`;
+        }
         
-        reportContent.innerHTML = html;
+        html += `<div style="margin-top:20px; border-top:1px solid #333; padding-top:15px;">`;
+        problems.forEach(p => {
+            const solved = mySolved.includes(p.id);
+            html += `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                <span style="font-size:12px; color:${solved?'#ccc':'#555'}; text-overflow:ellipsis; overflow:hidden; white-space:nowrap; width:280px;">${p.title}</span>
+                <span class="badge ${solved?'badge-solved':'badge-pending'}">${solved?'SOLVED':'PENDING'}</span>
+            </div>`;
+        });
+        html += `</div>`;
+        
+        document.getElementById('report-category-stats').innerHTML = html;
     }
 
+    // [관리자] 기타 기능 유지
     function renderSortManager() {
         const b = document.getElementById('sort-body'); b.innerHTML = "";
         problems.forEach((p, i) => {
@@ -445,6 +484,7 @@
         document.getElementById('report-view').style.display = 'none';
     }
 
+    // [기본] 지문 처리 (기능 유지)
     function smartFormatDesc(text) {
         if (!text) return "";
         let html = "", isExample = false;
