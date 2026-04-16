@@ -559,7 +559,8 @@ function importExcel(file){
         }
 
         const sid=`${tc}_${name}`;
-        const ex=db.students.find(s=>s.id===sid);
+        // 기존 db 또는 이미 추가된 newStudents에서 중복 확인
+        const ex=db.students.find(s=>s.id===sid)||newStudents.find(s=>s.id===sid);
         const baseObj=ex||{id:sid,name,day,time,timeCode:tc,lessons,paused:false};
         baseObj.lessons=lessons;
         // 출석설정 시트 > 컬럼 위치 기준 자동 생성 순으로 적용
@@ -571,7 +572,8 @@ function importExcel(file){
           // 신규 학생이고 데이터 없으면 초기화
           baseObj.manualAttend=undefined;
         }
-        newStudents.push(baseObj);
+        // 중복 방지: 이미 newStudents에 없는 경우만 추가
+        if(!newStudents.find(s=>s.id===sid)) newStudents.push(baseObj);
       }
       db.students=newStudents;
       db.importedAt=new Date().toISOString();
@@ -955,7 +957,7 @@ function makeCard(s){
       <div class="form-row" id="cr_${sk}"><label>수업내용</label><textarea id="ct_${sk}" placeholder="예) 스3 아바타 만들기"></textarea></div>
       <div class="absent-row"><input type="checkbox" id="ab_${sk}" onchange="toggleAbsent('${sk}')"><label for="ab_${sk}">결석</label></div>
       <div class="form-btns">
-        <button class="btn-save" onclick="saveLesson('${s.id}')">저장</button>
+        <button class="btn-save" onclick="saveLesson('${s.id}',this)">저장</button>
         <button class="btn-cancel" onclick="togglePlusForm('${fid}',this.closest('.form-box').previousElementSibling.querySelector('button:last-child'))">취소</button>
       </div>
     </div>`:`
@@ -964,7 +966,7 @@ function makeCard(s){
       <div class="form-row" id="cr_${sk}"><label>수업내용</label><textarea id="ct_${sk}" placeholder="예) 스3 아바타 만들기"></textarea></div>
       <div class="absent-row"><input type="checkbox" id="ab_${sk}" onchange="toggleAbsent('${sk}')"><label for="ab_${sk}">결석</label></div>
       <div class="form-btns">
-        <button class="btn-save" onclick="saveLesson('${s.id}')">저장</button>
+        <button class="btn-save" onclick="saveLesson('${s.id}',this)">저장</button>
       </div>
     </div>`}`}
 
@@ -1027,12 +1029,17 @@ function toggleHist(id,btn){
   el.classList.toggle('open')?btn.textContent='▼ 접기':btn.textContent=`▶ 전체 기록 (${el.querySelectorAll('.h-item').length}건)`;
 }
 
-function saveLesson(sid){
-  const s=db.students.find(x=>x.id===sid);if(!s)return;
+function saveLesson(sid,btn){
+  const s=db.students.find(x=>x.id===sid);if(!s){alert('학생 정보를 찾을 수 없습니다. 페이지를 새로고침 후 다시 시도해주세요.');return;}
   const k=safeId(sid);
-  const date=document.getElementById('dt_'+k)?.value.trim();
-  const content=document.getElementById('ct_'+k)?.value.trim();
-  const absent=document.getElementById('ab_'+k)?.checked;
+  // 버튼이 속한 폼 내에서 요소를 찾아 ID 충돌 방지
+  const form=btn?btn.closest('.form-box'):null;
+  const dtEl=form?form.querySelector('[id="dt_'+k+'"]'):document.getElementById('dt_'+k);
+  const ctEl=form?form.querySelector('[id="ct_'+k+'"]'):document.getElementById('ct_'+k);
+  const abEl=form?form.querySelector('[id="ab_'+k+'"]'):document.getElementById('ab_'+k);
+  const date=dtEl?.value?.trim();
+  const content=ctEl?.value?.trim();
+  const absent=abEl?.checked;
   if(!absent&&!content){alert('수업 내용을 입력해주세요.');return;}
   const mKey=new Date().getFullYear()+'-'+thisMonth();
 
@@ -1045,7 +1052,8 @@ function saveLesson(sid){
     if(idx!==-1) s.manualAttend[mKey][idx]=absent?'absent':'done';
   }
 
-  saveDB();refreshCard(s);updateSummary();
+  saveDB();
+  try{refreshCard(s);updateSummary();}catch(e){console.error('카드 갱신 오류:',e);renderCurrent();}
   toast(absent?`📋 ${s.name} 결석 처리됨`:`✅ ${s.name} 기록 저장!`);
 }
 
