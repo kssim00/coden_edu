@@ -399,8 +399,9 @@ function hasTodayLesson(s){const td=todayShort();return s.lessons.some(l=>l.date
 function thisMonth(){return new Date().getMonth()+1;}
 
 /* ── 핵심: 4회 단위 월 출석 계산 (5주 자동처리) ──
-   수업을 날짜순으로 정렬 → 4개씩 묶어서 1달치 → 청크 첫 수업의 실제 달로 billing month 지정
-   → 5번째 수업은 자동으로 다음 달치에 포함
+   수업을 날짜순으로 정렬 → 같은 달 안에서 4개씩 묶어서 1달치로 청구
+   → 5번째 수업(달 초과분)은 자동으로 다음 달치에 포함
+   → 예) 4월에 5번 수업 → 1~4번째는 4월, 5번째는 5월 1회차로 처리
    → 휴식 후 복귀해도 실제 수업 날짜 기준이므로 정확하게 계산됨 */
 function monthlyAttendance(student, targetMonth) {
   const m = targetMonth !== undefined ? targetMonth : thisMonth();
@@ -412,11 +413,48 @@ function monthlyAttendance(student, targetMonth) {
     .map(l => { const pts=l.date.split('/'); const mo=parseInt(pts[0]); const d=parseInt(pts[1])||0; return {...l,_m:mo,_d:d}; })
     .sort((a,b)=>a._m!==b._m?a._m-b._m:a._d-b._d);
 
+  // 달별로 수업을 그룹화한 뒤, 각 달에서 MONTH_CLASSES 초과분은 다음 달로 이월
   const chunks = [];
-  for(let i=0;i<dated.length;i+=MONTH_CLASSES){
-    const slice=dated.slice(i,i+MONTH_CLASSES);
-    chunks.push({billing:slice[0]._m, lessons:slice});
+  const monthMap = {}; // month → lessons[]
+  dated.forEach(l => {
+    if(!monthMap[l._m]) monthMap[l._m] = [];
+    monthMap[l._m].push(l);
+  });
+  // 월 순서대로 처리: 각 달의 초과분을 다음 달 앞에 삽입
+  const months = Object.keys(monthMap).map(Number).sort((a,b)=>a-b);
+  let carry = []; // 이전 달에서 넘어온 초과 수업
+  months.forEach(mo => {
+    const combined = [...carry, ...monthMap[mo]];
+    carry = [];
+    // MONTH_CLASSES 단위로 청크 분리
+    for(let i=0;i<combined.length;i+=MONTH_CLASSES){
+      const slice = combined.slice(i, i+MONTH_CLASSES);
+      if(i === 0){
+        // 이 달의 정규 청크: billing = mo
+        chunks.push({billing: mo, lessons: slice});
+      } else {
+        // 초과분: 다음 달로 이월 (carry에 보관)
+        carry.push(...slice);
+      }
+    }
+  });
+  // 마지막 이월분 처리 (carry가 남아있는 경우 → 마지막 달 + 1로 billing)
+  if(carry.length > 0){
+    const lastMonth = months[months.length-1];
+    for(let i=0;i<carry.length;i+=MONTH_CLASSES){
+      const slice = carry.slice(i, i+MONTH_CLASSES);
+      // 이월분의 billing은 원래 달 + 1 (carry의 첫 수업이 속한 달 + 1)
+      const billingM = slice[0]._m < 12 ? slice[0]._m + 1 : 1;
+      // 이미 해당 billing 월 청크가 있으면 합치지 않고 별도 청크로 추가
+      const existing = chunks.find(c=>c.billing===billingM);
+      if(existing){
+        existing.lessons = [...slice, ...existing.lessons].slice(0, MONTH_CLASSES);
+      } else {
+        chunks.push({billing: billingM, lessons: slice});
+      }
+    }
   }
+
   const chunk = dated.length ? chunks.find(c=>c.billing===m) : null;
   // 슬롯별 날짜 배열 (tooltip용)
   const slotDates = Array.from({length:MONTH_CLASSES},(_,i)=>chunk&&i<chunk.lessons.length?(chunk.lessons[i].date||null):null);
@@ -607,8 +645,8 @@ function exportExcel(){
   MONTHS.forEach((m,i)=>{ hdrRow[DATA_START+i*SLOTS]=m; });
 
   // ── 데이터 행 구성
-  // 4개씩 묶되, 그룹의 시작 위치는 첫 수업의 실제 월에 맞춤
-  // → 4월 입회 학생은 1~3월 빈칸, 4월 첫 칸부터 기입
+  // 같은 달 안에서 4개씩 묶되, 초과분은 다음 달로 이월
+  // → 4월 5번째 수업은 5월 칸에 기입
   const wsData=[hdrRow];
 
   sorted.forEach((s,idx)=>{
@@ -617,11 +655,35 @@ function exportExcel(){
       .map(l=>{const[mo,dd]=l.date.split('/').map(Number);return{...l,_m:mo,_d:dd||0};})
       .sort((a,b)=>a._m!==b._m?a._m-b._m:a._d-b._d);
     const noDate=s.lessons.filter(l=>!(l.date&&/^\d+\//.test(l.date)));
-    const all=[...withDate,...noDate];
 
-    // 4개씩 묶기
+    // 달별로 그룹화 후 초과분 이월
+    const monthMap={};
+    withDate.forEach(l=>{if(!monthMap[l._m])monthMap[l._m]=[];monthMap[l._m].push(l);});
+    const expMonths=Object.keys(monthMap).map(Number).sort((a,b)=>a-b);
     const groups=[];
-    for(let i=0;i<all.length;i+=SLOTS)groups.push(all.slice(i,i+SLOTS));
+    let expCarry=[];
+    expMonths.forEach(mo=>{
+      const combined=[...expCarry,...monthMap[mo]];
+      expCarry=[];
+      for(let i=0;i<combined.length;i+=SLOTS){
+        const slice=combined.slice(i,i+SLOTS);
+        if(i===0){groups.push({billing:mo,lessons:[...slice]});}
+        else{expCarry.push(...slice);}
+      }
+    });
+    if(expCarry.length>0){
+      for(let i=0;i<expCarry.length;i+=SLOTS){
+        const slice=expCarry.slice(i,i+SLOTS);
+        const billingM=slice[0]._m<12?slice[0]._m+1:1;
+        const existing=groups.find(c=>c.billing===billingM);
+        if(existing){existing.lessons=[...slice,...existing.lessons].slice(0,SLOTS);}
+        else{groups.push({billing:billingM,lessons:[...slice]});}
+      }
+    }
+    if(noDate.length>0){
+      if(groups.length>0){groups[groups.length-1].lessons.push(...noDate);}
+      else{groups.push({billing:1,lessons:noDate});}
+    }
 
     const row=new Array(DATA_START+SLOTS*12).fill(null);
     row[0]=idx+1;
@@ -630,15 +692,12 @@ function exportExcel(){
 
     let lastPos=-1;
     groups.forEach((g)=>{
-      // 그룹의 첫 날짜 수업으로 컬럼 위치(월) 결정
-      const firstWithDate=g.find(l=>l._m);
-      const groupMonth=firstWithDate?firstWithDate._m:(lastPos>=0?lastPos+2:1);
-      // 실제 월 위치 vs 이전 그룹 다음 위치 중 큰 것 선택 → 빈칸 유지, 겹침 방지
-      const pos=Math.max(lastPos+1, groupMonth-1); // 0-indexed (0=1월, 3=4월)
+      const groupMonth=g.billing||1;
+      const pos=Math.max(lastPos+1, groupMonth-1); // 0-indexed
       if(pos>=12)return;
       lastPos=pos;
       const base=DATA_START+pos*SLOTS;
-      g.forEach((l,si)=>{
+      g.lessons.forEach((l,si)=>{
         let cellVal;
         if(l.absent){
           const realDate=l.date&&!/\/0$/.test(l.date);
