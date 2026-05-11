@@ -430,20 +430,40 @@ function monthlyAttendance(student, targetMonth) {
     monthMap[l._m].push(l);
   });
   // 월 순서대로 처리: 각 달의 초과분을 다음 달 앞에 삽입
+  // 단, 이전 달이 미완성(4회 미만)이면 다음 달 수업으로 먼저 채움
+  // → 예) 4월 3회 후 5/4 수업 → 4월 4회차로 처리
   const months = Object.keys(monthMap).map(Number).sort((a,b)=>a-b);
   let carry = []; // 이전 달에서 넘어온 초과 수업
   months.forEach(mo => {
-    const combined = [...carry, ...monthMap[mo]];
-    carry = [];
-    // MONTH_CLASSES 단위로 청크 분리
-    for(let i=0;i<combined.length;i+=MONTH_CLASSES){
-      const slice = combined.slice(i, i+MONTH_CLASSES);
-      if(i === 0){
-        // 이 달의 정규 청크: billing = mo
-        chunks.push({billing: mo, lessons: slice});
+    if(carry.length > 0){
+      // 이전 달 초과분 + 이번 달 수업 합산 처리
+      const combined = [...carry, ...monthMap[mo]];
+      carry = [];
+      for(let i=0;i<combined.length;i+=MONTH_CLASSES){
+        const slice = combined.slice(i, i+MONTH_CLASSES);
+        if(i === 0){ chunks.push({billing: mo, lessons: slice}); }
+        else { carry.push(...slice); }
+      }
+    } else {
+      // 이전 달 청크가 미완성이면 → 이번 달 수업으로 먼저 채우기
+      const prevChunk = chunks[chunks.length - 1];
+      if(prevChunk && prevChunk.lessons.length < MONTH_CLASSES){
+        const remaining = MONTH_CLASSES - prevChunk.lessons.length;
+        const toFill = monthMap[mo].slice(0, remaining);
+        const rest = monthMap[mo].slice(remaining);
+        prevChunk.lessons.push(...toFill);
+        for(let i=0;i<rest.length;i+=MONTH_CLASSES){
+          const slice = rest.slice(i, i+MONTH_CLASSES);
+          if(i === 0){ chunks.push({billing: mo, lessons: slice}); }
+          else { carry.push(...slice); }
+        }
       } else {
-        // 초과분: 다음 달로 이월 (carry에 보관)
-        carry.push(...slice);
+        // 일반 처리: 이번 달 수업을 MONTH_CLASSES 단위로 묶기
+        for(let i=0;i<monthMap[mo].length;i+=MONTH_CLASSES){
+          const slice = monthMap[mo].slice(i, i+MONTH_CLASSES);
+          if(i === 0){ chunks.push({billing: mo, lessons: slice}); }
+          else { carry.push(...slice); }
+        }
       }
     }
   });
@@ -452,9 +472,7 @@ function monthlyAttendance(student, targetMonth) {
     const lastMonth = months[months.length-1];
     for(let i=0;i<carry.length;i+=MONTH_CLASSES){
       const slice = carry.slice(i, i+MONTH_CLASSES);
-      // 이월분의 billing은 원래 달 + 1 (carry의 첫 수업이 속한 달 + 1)
       const billingM = slice[0]._m < 12 ? slice[0]._m + 1 : 1;
-      // 이미 해당 billing 월 청크가 있으면 합치지 않고 별도 청크로 추가
       const existing = chunks.find(c=>c.billing===billingM);
       if(existing){
         existing.lessons = [...slice, ...existing.lessons].slice(0, MONTH_CLASSES);
@@ -686,12 +704,36 @@ function exportExcel(){
     const groups=[];
     let expCarry=[];
     expMonths.forEach(mo=>{
-      const combined=[...expCarry,...monthMap[mo]];
-      expCarry=[];
-      for(let i=0;i<combined.length;i+=SLOTS){
-        const slice=combined.slice(i,i+SLOTS);
-        if(i===0){groups.push({billing:mo,lessons:[...slice]});}
-        else{expCarry.push(...slice);}
+      if(expCarry.length>0){
+        // 이전 달 초과분 + 이번 달 수업 합산 처리
+        const combined=[...expCarry,...monthMap[mo]];
+        expCarry=[];
+        for(let i=0;i<combined.length;i+=SLOTS){
+          const slice=combined.slice(i,i+SLOTS);
+          if(i===0){groups.push({billing:mo,lessons:[...slice]});}
+          else{expCarry.push(...slice);}
+        }
+      } else {
+        // 이전 달 청크가 미완성이면 → 이번 달 수업으로 먼저 채우기
+        const prevGroup=groups[groups.length-1];
+        if(prevGroup&&prevGroup.lessons.length<SLOTS){
+          const remaining=SLOTS-prevGroup.lessons.length;
+          const toFill=monthMap[mo].slice(0,remaining);
+          const rest=monthMap[mo].slice(remaining);
+          prevGroup.lessons.push(...toFill);
+          for(let i=0;i<rest.length;i+=SLOTS){
+            const slice=rest.slice(i,i+SLOTS);
+            if(i===0){groups.push({billing:mo,lessons:[...slice]});}
+            else{expCarry.push(...slice);}
+          }
+        } else {
+          // 일반 처리
+          for(let i=0;i<monthMap[mo].length;i+=SLOTS){
+            const slice=monthMap[mo].slice(i,i+SLOTS);
+            if(i===0){groups.push({billing:mo,lessons:[...slice]});}
+            else{expCarry.push(...slice);}
+          }
+        }
       }
     });
     if(expCarry.length>0){
