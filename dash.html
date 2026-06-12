@@ -1310,9 +1310,9 @@ function toggleDot(sid,dotIdx){
     const auto=monthlyAttendance(s,activeM);
     s.manualAttend[mKey]=Array.from({length:MONTH_CLASSES},(_,i)=>auto.slots[i]||'empty');
   }
-  // empty→done→absent→empty 순환
+  // empty→absent→done→empty 순환
   const cur=s.manualAttend[mKey][dotIdx]||'empty';
-  s.manualAttend[mKey][dotIdx]=cur==='empty'?'done':cur==='done'?'absent':'empty';
+  s.manualAttend[mKey][dotIdx]=cur==='empty'?'absent':cur==='absent'?'done':'empty';
   saveDB();refreshCard(s);updateSummary();
   const labels={done:'✅ 출석',absent:'❌ 결석',empty:'⬜ 미수업'};
   toast(`${s.name} ${dotIdx+1}번째 수업 → ${labels[s.manualAttend[mKey][dotIdx]]}`);
