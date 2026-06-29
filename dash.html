@@ -1246,27 +1246,25 @@ function saveLesson(sid,btn){
     s.lessons.push(newLesson);
   }
 
-  // manualAttend 업데이트: 첫 번째 빈 슬롯에 새 수업 반영 (기존 수동 설정은 유지)
-  // 현재 달이 꽉 찼으면 다음 달 슬롯에 반영
-  if(s.manualAttend){
-    // 현재 달에 빈 슬롯이 있으면 거기에 반영
-    if(s.manualAttend[mKey]){
-      const idx=s.manualAttend[mKey].indexOf('empty');
-      if(idx!==-1){
-        s.manualAttend[mKey][idx]=absent?'absent':'done';
-      } else {
-        // 현재 달 꽉 참 → 다음 달 mKey에 반영
-        const nextM=activeM<12?activeM+1:1;
-        const nextMKey=new Date().getFullYear()+'-'+nextM;
-        // 다음 달 manualAttend가 없으면 새 레슨 추가 전 상태 기준으로 초기화 후 첫 슬롯에 반영
-        if(!s.manualAttend[nextMKey]){
-          s.manualAttend[nextMKey]=Array.from({length:MONTH_CLASSES},()=>'empty');
-        }
-        const nIdx=s.manualAttend[nextMKey].indexOf('empty');
-        if(nIdx!==-1) s.manualAttend[nextMKey][nIdx]=absent?'absent':'done';
-        // 카드 보기 월을 다음 달로 전환 (7월 슬롯이 보이도록)
-        _cardViewMonth[s.id]=nextM;
+  // manualAttend 업데이트: 현재 달이 꽉 찼으면 다음 달 슬롯에 반영
+  {
+    if(!s.manualAttend) s.manualAttend={};
+    if(!s.manualAttend[mKey]){
+      const autoCur=monthlyAttendance(s,activeM);
+      s.manualAttend[mKey]=Array.from({length:MONTH_CLASSES},(_,i)=>autoCur.slots[i]||'empty');
+    }
+    const idx=s.manualAttend[mKey].indexOf('empty');
+    if(idx!==-1){
+      s.manualAttend[mKey][idx]=absent?'absent':'done';
+    } else {
+      const nextM=activeM<12?activeM+1:1;
+      const nextMKey=new Date().getFullYear()+'-'+nextM;
+      if(!s.manualAttend[nextMKey]){
+        s.manualAttend[nextMKey]=Array.from({length:MONTH_CLASSES},()=>'empty');
       }
+      const nIdx=s.manualAttend[nextMKey].indexOf('empty');
+      if(nIdx!==-1) s.manualAttend[nextMKey][nIdx]=absent?'absent':'done';
+      _cardViewMonth[s.id]=nextM;
     }
   }
 
