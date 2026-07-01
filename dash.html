@@ -514,17 +514,26 @@ function isWarn(s){
 }
 
 /* ── 활성 월 계산 ──
-   지난달 수업이 있고 + 4회 미만 + 결석(x) 없음 → 지난달이 아직 진행중 → 지난달 반환
-   지난달에 결석(x)가 있거나 4회 완료됐으면 → 이번달 반환 */
+   현재 달 이전으로 거슬러 올라가며, 빈 슬롯(empty)이 남아있는 가장 오래된 달을 찾음
+   → 결석(x) 여부는 무관: 결석은 사용자가 "이 슬롯은 채울 필요 없음"이라고
+     의도적으로 표시한 것이므로, 결석이 있어도 그 달에 빈 슬롯이 남아있으면 여전히 활성 상태
+   → 오늘이 몇월이든 상관없이, 지나간 달에 비어있는 슬롯이 있으면 그곳부터 채움
+   → 어떤 달이 꽉 차있으면(빈 슬롯 없음) 그보다 이전 달은 이미 정산된 것이므로 탐색 중단 */
 function getActiveMonth(student){
   const cur = thisMonth();
-  const prev = cur === 1 ? 12 : cur - 1;
-  const prevMa = monthlyAttendance(student, prev);
-  // 지난달 수업이 있고, 4회 미만이고, 결석이 없으면 지난달이 아직 활성
-  if(prevMa.total > 0 && prevMa.total < MONTH_CLASSES && !prevMa.slots.includes('absent')){
-    return prev;
+  let candidate = cur;
+  for(let back=1; back<=6; back++){
+    let m = cur - back;
+    if(m<=0) m += 12;
+    const ma = monthlyAttendance(student, m);
+    if(ma.total===0) break; // 해당 달에 기록 자체가 없으면 더 이전은 볼 필요 없음
+    if(ma.slots.includes('empty')){
+      candidate = m; // 빈 슬롯이 있는 가장 오래된 달까지 계속 갱신
+    } else {
+      break; // 꽉 찬 달을 만나면 중단 (그 이전 달은 이미 정산됨)
+    }
   }
-  return cur;
+  return candidate;
 }
 
 /* ── 파일 ── */
