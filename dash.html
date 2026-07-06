@@ -1052,15 +1052,28 @@ function renderCardAttRow(s, viewM){
 }
 
 // 카드별 보기 월 상태 저장
+// ※ 기존엔 메모리(_cardViewMonth)에만 저장해서 새로고침/재렌더 시 초기화되어
+//   "화면엔 6월인데 실제로는 7월에 반영되는" 버그가 있었음.
+//   → 학생 데이터(s.viewMonth)에 직접 저장해 절대 사라지지 않도록 수정.
 const _cardViewMonth={};
+function getCardViewMonth(s){
+  if(s.viewMonth) return s.viewMonth;
+  if(_cardViewMonth[s.id]) return _cardViewMonth[s.id];
+  return getActiveMonth(s);
+}
+function setCardViewMonth(s, m){
+  s.viewMonth = m;
+  _cardViewMonth[s.id] = m;
+}
 
 function shiftCardMonth(sid, delta){
   const s=db.students.find(x=>x.id===sid);if(!s)return;
   const curM=thisMonth();
-  const curView=_cardViewMonth[sid]||(getActiveMonth(s));
+  const curView=getCardViewMonth(s);
   const newM=Math.max(1,Math.min(curM,curView+delta));
-  _cardViewMonth[sid]=newM;
-  // 출석 영역만 교체
+  setCardViewMonth(s,newM);
+  saveDB();
+  // 출석 영역만 교체 (실제로 반영된 월을 재확인하여 렌더링)
   const sk=safeId(sid);
   const attWrap=document.getElementById('matt_wrap_'+sk);
   if(attWrap) attWrap.innerHTML=renderCardAttRow(s,newM);
@@ -1072,10 +1085,8 @@ function makeCard(s){
   card.className='s-card'+(s.paused?' paused':'');
   card.id='card_'+safeId(s.id);
 
-  const activeM=getActiveMonth(s);
-  // 카드별 보기 월 초기화 (renderAll/refreshCard 후에도 유지)
-  if(!_cardViewMonth[s.id]) _cardViewMonth[s.id]=activeM;
-  const viewM=_cardViewMonth[s.id];
+  // 카드별 보기 월: 학생 데이터에 저장된 값을 최우선 사용 (새로고침해도 유지)
+  const viewM=getCardViewMonth(s);
   const ma=monthlyAttendance(s,viewM);
   const mPct=Math.min(100,Math.round(ma.done/MONTH_CLASSES*100));
   const todayDone=hasTodayLesson(s);
@@ -1273,7 +1284,7 @@ function saveLesson(sid,btn){
       }
       const nIdx=s.manualAttend[nextMKey].indexOf('empty');
       if(nIdx!==-1) s.manualAttend[nextMKey][nIdx]=absent?'absent':'done';
-      _cardViewMonth[s.id]=nextM;
+      setCardViewMonth(s,nextM);
     }
   }
 
@@ -1364,7 +1375,10 @@ function togglePause(sid){
 function toggleDot(sid,dotIdx,targetM){
   const s=db.students.find(x=>x.id===sid);if(!s||s.paused)return;
   if(!s.manualAttend)s.manualAttend={};
-  const activeM=targetM||getActiveMonth(s);
+  // targetM(클릭 당시 화면에 보이던 월)을 그대로 고정해서 사용.
+  // getActiveMonth()로 재계산하지 않음 → "보이는 월과 실제 반영 월이 달라지는" 문제 방지.
+  const activeM=targetM;
+  setCardViewMonth(s,activeM); // 보기 월도 함께 고정 저장 (새로고침해도 안 바뀌도록)
   const mKey=new Date().getFullYear()+'-'+activeM;
   // 현재 자동계산 슬롯을 기반으로 수동 배열 초기화
   if(!s.manualAttend[mKey]){
@@ -1381,7 +1395,7 @@ function toggleDot(sid,dotIdx,targetM){
   if(attWrap) attWrap.innerHTML=renderCardAttRow(s,activeM);
   updateSummary();
   const labels={done:'✅ 출석',absent:'❌ 결석',makeup:'🔄 보충완료',empty:'⬜ 미수업'};
-  toast(`${s.name} ${dotIdx+1}번째 수업 → ${labels[s.manualAttend[mKey][dotIdx]]}`);
+  toast(`${s.name} ${activeM}월 ${dotIdx+1}번째 수업 → ${labels[s.manualAttend[mKey][dotIdx]]}`);
 }
 /* ── 지난달 패널 도트 클릭 (보충 포함) ── */
 function toggleLmDot(sid,targetM,dotIdx){
@@ -1402,7 +1416,7 @@ function toggleLmDot(sid,targetM,dotIdx){
 
 function clearManual(sid){
   const s=db.students.find(x=>x.id===sid);if(!s)return;
-  const viewM=_cardViewMonth[sid]||getActiveMonth(s);
+  const viewM=getCardViewMonth(s);
   const mKey=new Date().getFullYear()+'-'+viewM;
   if(s.manualAttend)delete s.manualAttend[mKey];
   saveDB();
