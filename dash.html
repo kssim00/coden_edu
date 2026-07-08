@@ -1254,6 +1254,17 @@ function saveLesson(sid,btn){
   const activeM=getActiveMonth(s);
   const mKey=new Date().getFullYear()+'-'+activeM;
 
+  // 2025-07-08 수정: manualAttend 초기값(자동계산 스냅샷)을 "새 레슨을 추가하기 전" 상태로
+  // 미리 떠둔다. 기존 코드는 레슨을 먼저 push한 뒤 monthlyAttendance()를 호출해서,
+  // 방금 추가한 오늘 수업이 자동계산에 이미 done으로 반영된 상태에서 또 한 번
+  // "빈 슬롯 찾아 done 표시" 로직이 실행되어 도트 2개가 동시에 체크되는 버그가 있었음.
+  if(!s.manualAttend) s.manualAttend={};
+  let manualBaseline=null;
+  if(!s.manualAttend[mKey]){
+    const autoBefore=monthlyAttendance(s,activeM); // 새 레슨 추가 전 기준
+    manualBaseline=Array.from({length:MONTH_CLASSES},(_,i)=>autoBefore.slots[i]||'empty');
+  }
+
   // 레슨 추가 (날짜가 있으면 날짜순 위치에 삽입, 없으면 맨 끝)
   const newLesson={id:uid(),date:date||'',content:absent?'결석':content,absent:!!absent};
   function parseDateVal(d){if(!d||!/^\d+\//.test(d))return Infinity;const[m,day]=d.split('/').map(Number);return m*100+(day||0);}
@@ -1268,10 +1279,8 @@ function saveLesson(sid,btn){
 
   // manualAttend 업데이트: 현재 달이 꽉 찼으면 다음 달 슬롯에 반영
   {
-    if(!s.manualAttend) s.manualAttend={};
-    if(!s.manualAttend[mKey]){
-      const autoCur=monthlyAttendance(s,activeM);
-      s.manualAttend[mKey]=Array.from({length:MONTH_CLASSES},(_,i)=>autoCur.slots[i]||'empty');
+    if(manualBaseline){
+      s.manualAttend[mKey]=manualBaseline;
     }
     const idx=s.manualAttend[mKey].indexOf('empty');
     if(idx!==-1){
