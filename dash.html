@@ -435,8 +435,32 @@
      않고, Claude가 [[embedded_data_refresh]] 절차로 최신 엑셀 기준 내장 데이터를
      새로 구워 넣거나 사용자가 직접 "불러오기"로 새 엑셀을 불러온 경우처럼 실제로
      더 최신인 엑셀 데이터가 생겼을 때만 정상적으로 갱신됨.
+   v7 (2026-09-29, 해결 확인됨): 버그 수정 — 3번째 도트를 눌러 결석(✕)으로 표시해 둔 뒤,
+     다음 수업 날(9/29) 출석을 기록하면 그 출석이 3번째 칸으로 끼어들고 결석 표시가
+     4번째 칸으로 밀려나던 문제(고주한 학생 9월 사례). 원인: 도트 클릭으로 만든 표시
+     (manualMark)와 날짜 없이 추가한 기록(noDate)은 가상 날짜 M/90~99를 쓰는데, 이게
+     "항상 그 달 실제 수업보다 뒤"로 정렬되도록 설계돼 있어서, 나중에 실제 날짜가 있는
+     수업이 추가되면 무조건 그 앞으로 새치기함. 엑셀 불러오기에서도 "결석/출석/보충"
+     글자만 적힌 칸이 뒤 칸의 실제 날짜보다 뒤로 밀리는 같은 문제가 있었음.
+     수정: 날짜(date)는 그대로 M/9x로 두고(표시·내보내기 로직 영향 없음), 정렬 전용
+     sortKey 필드를 새로 추가. lessonSortKey()가 sortKey가 있으면 그걸, 없으면 월*100+일을
+     쓰며 monthlyAttendance/exportExcel 정렬이 이 값을 사용. 도트 클릭/날짜 없는 추가는
+     "그 달 마지막 칸 바로 뒤"(직전 칸 키 +0.01), 엑셀 불러오기는 같은 달 4칸 블록 안의
+     가까운 실제 날짜 칸 기준으로 sortKey를 부여. 이미 저장된 옛 표시는
+     migrateManualMarkOrder()가 1회 보정: 표시를 만든 시각(uid 끝의 타임스탬프)보다 1분
+     이상 나중에 만들어진 실제 수업이 그 표시 앞에 정렬돼 있으면, 표시를 그 수업 바로
+     앞으로 되돌림. 기록을 편집해 날짜를 바꾸면 sortKey는 지움.
+   v8 (2026-09-29, 해결 확인됨): 버그 수정 — 9월 4회를 다 채우고 9/28(월)에 한 수업이
+     10월 1회차로 넘어갔는데(전우진·최찬솔 등), 달력상 아직 9월이라 카드의 ▶(다음달)
+     버튼이 막혀 10월 출석칸을 볼 수 없었던 문제. 원인: 카드 월 이동이 "오늘 달력 월"
+     까지만 허용됐고, getActiveMonth()도 현재 달 이후는 보지 않았음.
+     수정: nextMonthOf()/hasCarryNextMonth() 추가 — 이번 달이 4칸 꽉 찼고 다음 달로
+     이월된 수업이 실제로 있으면 getActiveMonth()가 다음 달을 활성 월로 돌려주고,
+     카드의 ▶ 버튼·shiftCardMonth()도 다음 달까지 이동 허용(12월→1월 포함).
+     이미 저장된 보기 월(viewMonth)이 이번 달에 고정돼 있던 학생은 페이지를 열 때
+     migrateViewMonthToCarry()가 다음 달로 맞춰줌.
    ──────────────────────────────────────────────────────────── */
-const APP_VERSION = 'v6';
+const APP_VERSION = 'v8';
 document.addEventListener('DOMContentLoaded', () => {
   const v = document.getElementById('appVersion');
   if (v) v.textContent = APP_VERSION;
@@ -474,6 +498,8 @@ function loadDB(){
       if(shouldApplyEmbedded){
         db=__embeddedData;
         migrateAllManualAttend();
+        migrateManualMarkOrder();
+        migrateViewMonthToCarry();
         localStorage.setItem(STORAGE_KEY,JSON.stringify(db));
         localStorage.setItem(REV_KEY,embImportedAt);
         return true;
@@ -486,6 +512,8 @@ function loadDB(){
       db=JSON.parse(s);
       if(db.students?.length>0){
         migrateAllManualAttend();
+        migrateManualMarkOrder();
+        migrateViewMonthToCarry();
         try{ localStorage.setItem(REV_KEY, db.importedAt||''); }catch(e){}
         return true;
       }
@@ -514,6 +542,48 @@ function migrateAllManualAttend(){
     if(migrated) saveDB();
   }catch(e){console.error('manualAttend 마이그레이션 오류:',e);}
 }
+// [v7 1회성 보정] sortKey가 없는 옛 "도트 클릭 표시/날짜 없는 기록"(M/9x)은 항상 그 달
+// 맨 뒤로 정렬돼, 그 뒤에 추가된 실제 수업이 앞자리로 새치기해 있을 수 있다. 표시를
+// 만든 시각(uid 타임스탬프)보다 1분 이상 나중에 만들어진 실제 수업이 같은 정산 그룹에
+// 있으면, 표시를 그중 가장 이른 수업 바로 앞으로 되돌린다. (같은 엑셀 불러오기로 함께
+// 만들어진 기록끼리는 시각 차이가 1분 미만이라 건드리지 않는다.)
+function migrateManualMarkOrder(){
+  try{
+    if(!db.students)return;
+    let changed=false;
+    const grp=l=>{const mo=parseInt((l.date||'').split('/')[0]);return l.billMonth||mo;};
+    db.students.forEach(s=>{
+      const marks=s.lessons.filter(l=>(l.manualMark||l.noDate)&&typeof l.sortKey!=='number'&&/^\d+\/9\d$/.test(l.date||'')&&uidTime(l.id)!=null)
+        .sort((a,b)=>uidTime(a.id)-uidTime(b.id));
+      marks.forEach(mk=>{
+        const tMk=uidTime(mk.id), g=grp(mk), kMk=lessonSortKey(mk);
+        const later=s.lessons.filter(r=>r!==mk&&!r.manualMark&&!r.noDate&&!r.absentNoDate&&r.date&&/^\d+\/\d+$/.test(r.date)
+          &&grp(r)===g&&lessonSortKey(r)<kMk&&uidTime(r.id)!=null&&uidTime(r.id)>tMk+60000);
+        if(!later.length)return;
+        const firstLater=Math.min(...later.map(lessonSortKey));
+        const before=s.lessons.filter(o=>o!==mk&&o.date&&/^\d+\//.test(o.date)&&grp(o)===g).map(lessonSortKey).filter(k=>k<firstLater);
+        const prevKey=before.length?Math.max(...before):firstLater-1;
+        mk.sortKey=Math.round(((prevKey+firstLater)/2)*1000)/1000;
+        changed=true;
+      });
+    });
+    if(changed) saveDB();
+  }catch(e){console.error('v7 표시 순서 보정 오류:',e);}
+}
+// [v8] 보기 월(viewMonth)이 이번 달에 저장돼 있지만 실제 활성 월이 다음 달(이월)인
+// 학생은 페이지를 열 때 다음 달로 맞춰준다.
+function migrateViewMonthToCarry(){
+  try{
+    if(!db.students)return;
+    const cur=thisMonth(); let changed=false;
+    db.students.forEach(s=>{
+      if(s.viewMonth===cur && hasCarryNextMonth(s,cur) && getActiveMonth(s)===nextMonthOf(cur)){
+        s.viewMonth=nextMonthOf(cur); changed=true;
+      }
+    });
+    if(changed) saveDB();
+  }catch(e){console.error('v8 보기 월 보정 오류:',e);}
+}
 function saveDB(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(db));}catch(e){}}
 function clearData(){if(!confirm('모든 데이터를 초기화하시겠습니까?'))return;localStorage.removeItem(STORAGE_KEY);db={students:[]};location.reload();}
 function saveToFile(){
@@ -536,6 +606,28 @@ function todayShort(){const d=new Date();return `${d.getMonth()+1}/${d.getDate()
 function todayDayCode(){const d=new Date().getDay();return d===0?'7':String(d);}
 function hasTodayLesson(s){const td=todayShort();return s.lessons.some(l=>l.date===td&&!l.absent);}
 function thisMonth(){return new Date().getMonth()+1;}
+// [v7] 정렬 키: sortKey(정렬 전용, 손으로 만든 표시/날짜 없는 기록에만 붙음)가 있으면
+// 그 값을, 없으면 실제 달력 날짜(월*100+일)를 쓴다. date 문자열 자체는 건드리지 않는다.
+function lessonSortKey(l){
+  if(typeof l.sortKey==='number'&&isFinite(l.sortKey)) return l.sortKey;
+  const pts=(l.date||'').split('/'); const mo=parseInt(pts[0])||0; const d=parseInt(pts[1])||0;
+  return mo*100+d;
+}
+// [v7] month 달의 "다음 빈 칸"에 새 표시를 넣을 때 쓸 sortKey — 현재 그 달 마지막 칸
+// 바로 뒤. 나중에 추가되는 실제 날짜 수업(예: 다음 주)보다는 항상 앞에 온다.
+function nextSlotSortKey(s, month){
+  const ma=monthlyAttendance(s,month);
+  let last=null;
+  ma.slotIds.forEach(id=>{ if(id){ const l=s.lessons.find(x=>x.id===id); if(l) last=l; } });
+  if(!last) return month*100+0.01;
+  return Math.round((lessonSortKey(last)+0.01)*1000)/1000;
+}
+// uid() 끝부분(Date.now().toString(36))에서 생성 시각을 꺼낸다(없으면 null).
+function uidTime(id){
+  if(!id||id.length<9) return null;
+  const t=parseInt(id.slice(-8),36);
+  return (t>1577836800000&&t<4102444800000)?t:null;
+}
 
 /* ── 핵심: 4회 단위 월 출석 계산 (5주 자동처리) ──
    수업을 날짜순으로 정렬 → 같은 달 안에서 4개씩 묶어서 1달치로 청구
@@ -612,7 +704,7 @@ function monthlyAttendance(student, targetMonth) {
   // "일(day)"만 보고 맨 뒤로 밀려서 도트 순서·툴팁 날짜가 실제와 어긋나게 된다.
   const dated = student.lessons
     .filter(l => l.date && /^\d+\//.test(l.date))
-    .map(l => { const pts=l.date.split('/'); const mo=parseInt(pts[0]); const d=parseInt(pts[1])||0; return {...l,_m:l.billMonth||mo,_d:d,_realSort:mo*100+d}; })
+    .map(l => { const pts=l.date.split('/'); const mo=parseInt(pts[0]); const d=parseInt(pts[1])||0; return {...l,_m:l.billMonth||mo,_d:d,_realSort:lessonSortKey(l)}; })
     .sort((a,b)=>a._realSort-b._realSort);
 
   const chunks = computeBillingChunks(dated);
@@ -662,6 +754,15 @@ function isWarn(s){
      의도적으로 표시한 것이므로, 결석이 있어도 그 달에 빈 슬롯이 남아있으면 여전히 활성 상태
    → 오늘이 몇월이든 상관없이, 지나간 달에 비어있는 슬롯이 있으면 그곳부터 채움
    → 어떤 달이 꽉 차있으면(빈 슬롯 없음) 그보다 이전 달은 이미 정산된 것이므로 탐색 중단 */
+// [v8] 다음 달 번호(12월 → 1월)
+function nextMonthOf(m){ return m%12+1; }
+// [v8] 이번 달 4칸이 다 찼고, 초과분이 다음 달로 실제 이월돼 있는가
+function hasCarryNextMonth(student, m){
+  const cur = m!==undefined ? m : thisMonth();
+  const maCur = monthlyAttendance(student, cur);
+  if(maCur.slots.length<MONTH_CLASSES || maCur.slots.includes('empty')) return false;
+  return monthlyAttendance(student, nextMonthOf(cur)).slots.length>0;
+}
 function getActiveMonth(student){
   const cur = thisMonth();
   let candidate = cur;
@@ -687,6 +788,9 @@ function getActiveMonth(student){
     }
     // else: 꽉 찬 달이어도 중단하지 않고 계속 더 이전 달을 탐색
   }
+  // [v8] 지난달까지 빈칸이 없고 이번 달도 꽉 찼는데 다음 달로 이월된 수업이 이미
+  // 있으면(예: 9월 4회 완료 후 9/28 수업 → 10월 1회차), 다음 달을 활성 월로 본다.
+  if(candidate===cur && hasCarryNextMonth(student, cur)) return nextMonthOf(cur);
   return candidate;
 }
 
@@ -804,12 +908,24 @@ function importExcel(file){
           const slotIdx=(mi!=null&&startC!=null)?(c-startC):null;
           const inSlotRange=slotIdx!=null&&slotIdx>=0&&slotIdx<4;
           const synthD=(mi!=null&&inSlotRange)?`${mi}/${90+slotIdx}`:'';
+          // [v7] 날짜 없는 칸(출석/결석/보충 글자, 날짜 없는 메모)의 정렬 키 — 같은 달 4칸
+          // 블록 안에서 앞쪽의 가장 가까운 실제 날짜 칸 바로 뒤(없으면 뒤쪽 칸 바로 앞)로
+          // 둬서, 엑셀에 적힌 칸 순서가 화면에서도 그대로 유지되게 한다.
+          const cellSortKey=(()=>{
+            if(mi==null||startC==null||!inSlotRange) return null;
+            const keyAt=cc=>{const ov=(row[cc]||'').toString().trim().split('\n')[0];const om=ov&&ov.match(/^(\d+)\/(\d+)/);return om?parseInt(om[1])*100+parseInt(om[2]):null;};
+            for(let cc=c-1;cc>=startC;cc--){const k=keyAt(cc);if(k!=null)return Math.round((k+0.01*(c-cc))*1000)/1000;}
+            for(let cc=c+1;cc<startC+4;cc++){const k=keyAt(cc);if(k!=null)return Math.round((k-0.01*(cc-c))*1000)/1000;}
+            return null;
+          })();
 
           if(MARK_STATUS[val]){
             if(inSlotRange){
               const status=MARK_STATUS[val];
-              lessons.push({id:uid(),date:synthD,content:MANUAL_MARK_CONTENT[status],
-                absent:status==='absent',makeup:status==='makeup',manualMark:true});
+              const mk={id:uid(),date:synthD,content:MANUAL_MARK_CONTENT[status],
+                absent:status==='absent',makeup:status==='makeup',manualMark:true};
+              if(cellSortKey!=null) mk.sortKey=cellSortKey;
+              lessons.push(mk);
             }
             continue;
           }
@@ -875,7 +991,9 @@ function importExcel(file){
             lessons.push(l);
           } else {
             // 날짜 없이 손으로 적은 실제 수업 메모 — 셀 위치 기준 가상 날짜 부여
-            lessons.push({absent:false,date:synthD,content:lines.join('\n'),noDate:true,id:uid()});
+            const nd={absent:false,date:synthD,content:lines.join('\n'),noDate:true,id:uid()};
+            if(cellSortKey!=null) nd.sortKey=cellSortKey;
+            lessons.push(nd);
           }
         }
 
@@ -956,7 +1074,7 @@ async function exportExcel(){
     // 정렬은 실제 달력 날짜(_realSort) 기준 — monthlyAttendance와 동일한 이유(위 주석 참고).
     const withDate=s.lessons
       .filter(l=>l.date&&/^\d+\//.test(l.date))
-      .map(l=>{const[mo,dd]=l.date.split('/').map(Number);return{...l,_m:l.billMonth||mo,_d:dd||0,_realSort:mo*100+(dd||0)};})
+      .map(l=>{const[mo,dd]=l.date.split('/').map(Number);return{...l,_m:l.billMonth||mo,_d:dd||0,_realSort:lessonSortKey(l)};})
       .sort((a,b)=>a._realSort-b._realSort);
     // 달별로 그룹화 후 초과분 이월 — computeBillingChunks()를 그대로 재사용(단일 소스 원칙)
     const groups=computeBillingChunks(withDate);
@@ -1287,8 +1405,9 @@ function renderCardAttRow(s, viewM){
     return `<span class="m-dot ${st}" title="${tip}" onclick="toggleDot('${s.id}',${i},${viewM})">${icon}</span>`;
   }).join('');
   const sk=safeId(s.id);
-  const canPrev=viewM>minM;
-  const canNext=viewM<curM;
+  const canPrev=viewM>minM || (curM===12 && viewM===1);
+  // [v8] 이번 달이 꽉 차 다음 달로 이월된 수업이 있으면 다음 달까지 볼 수 있게 허용
+  const canNext=viewM<curM || (viewM===curM && hasCarryNextMonth(s, curM));
   return `
     <div class="m-att-row">
       <span class="m-att-label">
@@ -1321,7 +1440,11 @@ function shiftCardMonth(sid, delta){
   const s=db.students.find(x=>x.id===sid);if(!s)return;
   const curM=thisMonth();
   const curView=getCardViewMonth(s);
-  const newM=Math.max(1,Math.min(curM,curView+delta));
+  // [v8] 다음 달로 이월된 수업이 있으면 이번 달 → 다음 달(12월→1월 포함) 이동 허용
+  let newM;
+  if(delta>0 && curView===curM && hasCarryNextMonth(s, curM)) newM=nextMonthOf(curM);
+  else if(delta<0 && curM===12 && curView===1) newM=12; // 12월에 내년 1월(이월)을 보다가 ◀
+  else newM=Math.max(1,Math.min(curM,curView+delta));
   setCardViewMonth(s,newM);
   saveDB();
   // 출석 영역만 교체 (실제로 반영된 월을 재확인하여 렌더링)
@@ -1522,7 +1645,7 @@ function saveLesson(sid,btn){
   const hasValidDate = date && /^\d+\//.test(date);
   const finalDate = hasValidDate ? date : synthDate(s, activeM);
   const newLesson={id:uid(),date:finalDate,content:absent?'결석':content,absent:!!absent};
-  if(!hasValidDate) newLesson.noDate=true;
+  if(!hasValidDate){ newLesson.noDate=true; newLesson.sortKey=nextSlotSortKey(s,activeM); } // [v7]
   const newVal=parseDateVal(finalDate);
   const insertIdx=s.lessons.findIndex(l=>parseDateVal(l.date)>newVal);
   if(insertIdx===-1)s.lessons.push(newLesson);
@@ -1605,6 +1728,7 @@ function saveEditedLesson(sid,lid){
   const newDate=(document.getElementById('hied_'+lid)?.value||'').trim();
   const newContent=(document.getElementById('hiec_'+lid)?.value||'').trim();
   if(!newContent&&!l.absent){alert('수업 내용을 입력해주세요.');return;}
+  if(newDate!==l.date) delete l.sortKey; // [v7] 날짜를 직접 고치면 그 날짜로 정렬
   l.date=newDate;
   l.content=newContent||l.content;
   // 날짜 변경 시 날짜순으로 재정렬
@@ -1708,8 +1832,10 @@ function applySlotStatus(s, activeM, dotIdx, newStatus){
     lesson.makeup=newStatus==='makeup';
     if(lesson.manualMark) lesson.content=MANUAL_MARK_LABEL[newStatus];
   } else {
+    // [v7] sortKey로 "지금 그 달 마지막 칸 바로 뒤"에 고정 — 나중에 실제 수업이 추가돼도 앞자리를 유지.
     s.lessons.push({id:uid(), date:synthDate(s,activeM), content:MANUAL_MARK_LABEL[newStatus],
-      absent:newStatus==='absent', makeup:newStatus==='makeup', manualMark:true});
+      absent:newStatus==='absent', makeup:newStatus==='makeup', manualMark:true,
+      sortKey:nextSlotSortKey(s,activeM)});
   }
 }
 function toggleDot(sid,dotIdx,targetM){
