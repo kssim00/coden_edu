@@ -459,8 +459,14 @@
      카드의 ▶ 버튼·shiftCardMonth()도 다음 달까지 이동 허용(12월→1월 포함).
      이미 저장된 보기 월(viewMonth)이 이번 달에 고정돼 있던 학생은 페이지를 열 때
      migrateViewMonthToCarry()가 다음 달로 맞춰줌.
+   v9 (2026-10-19, 해결 확인됨): 버그 수정 — "전체" 탭에서 "퇴원 학생 포함"을 켜고
+     퇴원 학생 줄의 "↩ 재원" 버튼을 눌러도 아무 반응이 없던 문제(재원 처리 알림도 안 뜸).
+     원인: 버튼의 onclick이 일반 따옴표 문자열 안에서 ${s.id}로 쓰여 있어 값이 치환되지
+     않고 글자 그대로 toggleWithdraw('${s.id}')가 전달됨 → 학생을 못 찾고 조용히 종료.
+     수정: 문자열 연결(+s.id+)로 바꿔 실제 학생 id가 전달되게 함. (학생 카드의 재원 버튼은
+     템플릿 문자열 안이라 원래 정상이었음.)
    ──────────────────────────────────────────────────────────── */
-const APP_VERSION = 'v8';
+const APP_VERSION = 'v9';
 document.addEventListener('DOMContentLoaded', () => {
   const v = document.getElementById('appVersion');
   if (v) v.textContent = APP_VERSION;
@@ -1338,7 +1344,7 @@ function renderAllTable(){
       <td style="max-width:190px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
         ${latest?`<span style="color:#3b82f6;font-size:10px">${latest.date}</span> ${latest.content||''}` : '<span style="color:#94a3b8">없음</span>'}
       </td>
-      <td>${s.withdrawn?'<span class="withdrawn-badge">🚪 퇴원</span> <span class="ic-btn" onclick="toggleWithdraw(\'${s.id}\')">↩ 재원</span>':warn?'<span style="color:#dc2626;font-weight:700">⚠️ 결석주의</span>':'<span style="color:#16a34a">✅ 정상</span>'}
+      <td>${s.withdrawn?'<span class="withdrawn-badge">🚪 퇴원</span> <span class="ic-btn" onclick="toggleWithdraw(\''+s.id+'\')">↩ 재원</span>':warn?'<span style="color:#dc2626;font-weight:700">⚠️ 결석주의</span>':'<span style="color:#16a34a">✅ 정상</span>'}
       </td>`;
     tbody.appendChild(tr);
   });
