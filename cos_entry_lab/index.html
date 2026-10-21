@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>COS 엔트리 연습 모드</title>
+<style>
+:root{--tl:#2bb3a3;--tl-d:#1f9486;--tl-l:#e6f7f4;--ink:#06403a;--line:#bfe3dd;--ok:#2f9e44;--bad:#e03131}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;font:15px/1.5 "Malgun Gothic","Apple SD Gothic Neo",sans-serif;color:#25302f;overflow:hidden}
+body{display:flex;flex-direction:column}
+button{font:inherit;cursor:pointer}
+button:disabled{opacity:.5;cursor:not-allowed}
+main{flex:1;min-height:0;display:flex}
+#left{width:30%;min-width:240px;background:var(--tl-l);border-right:1px solid var(--line);position:relative;display:flex;flex-direction:column}
+#pdf{flex:1;overflow:auto}
+#pdf img{display:block;height:auto;margin:0 auto}
+#pdf .note{padding:20px;color:#0b6b61}
+#split{width:7px;cursor:col-resize;background:#cfe9e5;flex:none}
+#split:hover,#split.drag{background:var(--tl)}
+#right{flex:1;min-width:0;position:relative;overflow:hidden;background:#eef1f6}
+#entryFrame{border:0;transform-origin:0 0;position:absolute;left:0;top:0;background:#fff}
+.zoomctl{position:absolute;right:12px;bottom:12px;background:#fff6;border:1px solid #0001;opacity:.5;transition:opacity .15s;border-radius:20px;padding:3px 6px;display:flex;align-items:center;gap:2px;font-weight:700;font-size:13px;z-index:5;box-shadow:none}
+.zoomctl:hover{opacity:1;background:#fffe}
+.zoomctl button{border:0;background:none;width:26px;height:26px;border-radius:50%;font-size:16px;color:var(--ink)}
+.zoomctl button:hover{background:var(--tl-l)}
+.zoomctl span{min-width:42px;text-align:center}
+#left .zoomctl{right:auto;left:12px}
+
+#bar{flex:none;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:10px 16px;background:var(--tl);color:var(--ink);padding:8px 16px;min-height:58px;position:relative}
+.who{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-weight:700}
+.badge{background:var(--ink);color:#fff;border-radius:6px;padding:1px 9px;font-size:12px}
+#bar select{font:inherit;font-size:13px;padding:3px 6px;border:0;border-radius:8px;background:#fffd;color:var(--ink);font-weight:700}
+.nums{display:flex;gap:5px;justify-content:center;flex-wrap:wrap}
+.nums button{width:32px;height:32px;border-radius:50%;border:0;background:#fff8;color:var(--ink);font-weight:700;position:relative;font-size:13px}
+.nums button:hover{background:#fffc}
+.nums button.on{background:var(--ink);color:#fff}
+.nums button .dot{position:absolute;right:-2px;top:-2px;width:11px;height:11px;border-radius:50%;border:2px solid var(--tl);background:transparent}
+.nums button .dot.doing{background:#fff}
+.nums button .dot.ok{background:var(--ok)}
+.btns{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+.btn{background:#fff;color:#0b6b61;border:0;border-radius:10px;padding:8px 14px;font-weight:700;white-space:nowrap}
+.btn:hover:not(:disabled){background:var(--tl-l)}
+.btn.go{background:var(--ink);color:#fff}
+.btn.go:hover:not(:disabled){background:#000}
+#menu{position:absolute;right:16px;bottom:62px;background:#fff;border:2px solid var(--tl);border-radius:12px;padding:6px;min-width:220px;box-shadow:0 6px 20px #0003;display:none;z-index:20}
+#menu.on{display:block}
+#menu button{display:block;width:100%;text-align:left;border:0;background:none;padding:8px 10px;border-radius:8px;color:#25302f}
+#menu button:hover{background:var(--tl-l)}
+#menu hr{border:0;border-top:1px solid #e5eeec;margin:4px 0}
+#menu .tt{font-size:11px;color:#889;padding:4px 10px 0}
+#toast{position:fixed;left:50%;bottom:76px;transform:translateX(-50%);background:#333;color:#fff;padding:8px 16px;border-radius:20px;display:none;z-index:50;font-size:14px;max-width:90vw}
+
+dialog{border:2px solid var(--tl);border-radius:14px;padding:0;width:min(620px,92vw);max-height:86vh;color:#25302f}
+dialog::backdrop{background:#0006}
+.rp{padding:20px 22px;display:flex;flex-direction:column;gap:12px;max-height:86vh;overflow:auto}
+.rp h2{margin:0;font-size:16px}
+.hero{font-size:34px;font-weight:800;color:var(--tl-d)}
+.hero small{font-size:14px;font-weight:600;color:#667}
+.rp .note{font-size:12px;color:#667;line-height:1.6;margin:0}
+.rgrid{display:flex;flex-wrap:wrap;gap:6px}
+.rgrid[hidden]{display:none}
+.rgrid button{padding:5px 10px;font-size:12px;border:1px solid var(--line);background:#fff;border-radius:8px}
+.rgrid button.on{outline:2px solid var(--tl)}
+.rgrid .s100{background:#e6f6ea;border-color:#b8e2c3}
+.rgrid .s0{background:#fdecec;border-color:#f3c3c3}
+.rgrid .smid{background:#fff4e0;border-color:#f6d9a5}
+.dtitle{font-weight:700;font-size:13px}
+.checks{list-style:none;margin:0;padding:0;display:grid;gap:4px}
+.checks li{display:flex;gap:8px;font-size:13px;padding:6px 10px;border-radius:8px;background:#f3f7f6}
+.checks li.ok b{color:var(--ok)} .checks li.no b{color:var(--bad)}
+.rp .row{display:flex;justify-content:flex-end;gap:8px}
+.rp .row button{border:0;background:var(--tl);color:#fff;border-radius:8px;padding:7px 16px;font-weight:700}
+@media (max-width:900px){#bar{grid-template-columns:1fr}.btns,.nums{justify-content:center}#menu{right:50%;transform:translateX(50%)}}
+@media (max-width:640px){main{flex-direction:column}#left{width:100%;height:45%}#split{display:none}}
+</style>
+</head>
+<body>
+<main>
+  <section id="left">
+    <div id="pdf" role="region" aria-label="문제 내용"></div>
+    <div class="zoomctl" id="pzoom"><button id="pMinus" aria-label="문제 축소">−</button><span id="pVal">100%</span><button id="pPlus" aria-label="문제 확대">＋</button></div>
+  </section>
+  <div id="split" role="separator" aria-label="패널 너비 조정"></div>
+  <section id="right">
+    <iframe id="entryFrame" src="entry_frame.html" title="엔트리 작업 화면" allow="autoplay; fullscreen"></iframe>
+    <div class="zoomctl" id="ezoom"><button id="eMinus" aria-label="엔트리 축소">−</button><span id="eVal">75%</span><button id="ePlus" aria-label="엔트리 확대">＋</button></div>
+  </section>
+</main>
+
+<div id="bar">
+  <div class="who"><span class="badge">연습</span>
+    <select id="gradeSel" aria-label="급수"></select>
+    <select id="setSel" aria-label="세트"></select></div>
+  <div class="nums" id="qnums"></div>
+  <div class="btns">
+    <button class="btn go" id="bGrade">채점하기</button>
+    <button class="btn" id="bAnswer">정답 보기 🔒</button>
+    <button class="btn" id="bMore">⋯ 더보기</button>
+  </div>
+  <div id="menu">
+    <button id="mAll">📝 이 세트 전체 채점</button>
+    <button id="mRedo">↩ 이 문제 처음부터 다시</button>
+    <button id="mExam">🧪 시험 모드로 가기</button>
+    <div id="teacherMenu" hidden>
+      <hr><div class="tt">원장님용</div>
+      <button id="dlExport">💾 내 답안 ENT 저장</button>
+      <button id="dlStart">⬇ 풀이(시작) ENT 받기</button>
+      <button id="dlAnswer">⬇ 정답 ENT 받기</button>
+      <button id="openPdf">📄 문제 PDF 새 창으로</button>
+    </div>
+  </div>
+</div>
+<div id="toast"></div>
+
+<dialog id="report">
+  <div class="rp">
+    <h2 id="rpTitle">채점 결과</h2>
+    <div class="hero" id="rpHero"></div>
+    <p class="note" id="rpNote"></p>
+    <div class="rgrid" id="rpGrid"></div>
+    <div id="rpDetailTitle" class="dtitle"></div>
+    <ul class="checks" id="rpChecks"></ul>
+    <div class="row"><button id="rpClose">닫기</button></div>
+  </div>
+</dialog>
+
+<script src="vendor/fflate.js"></script>
+<script src="grader.js"></script>
+<script>
+const CONFIG = { grades: {
+  "4급": { sets: ["1회","2회","3회"], problems: 10, data: "data/4" },
+  "3급": { sets: ["1회 (최신기출)","2회","3회"], problems: 10, data: "data/3" },
+  "2급": { sets: ["1회 (최신기출)","2회","3회"], problems: 10, data: "data/2" },
+  "1급": { sets: ["1회 (최신기출)","2회","3회"], problems: 10, data: "data/1" } } };
+const TEACHER = /[?&]teacher=1/.test(location.search);
+const UNLOCK_AFTER = 2;           // 채점에서 이만큼 틀리면 정답 보기가 열려요
+
+const $ = id => document.getElementById(id);
+const nn = n => String(n).padStart(2, "0");
+const store = {
+  get(k, d){ try{ const v = localStorage.getItem("cosLab:" + k); return v === null ? d : JSON.parse(v); }catch(e){ return d; } },
+  set(k, v){ try{ localStorage.setItem("cosLab:" + k, JSON.stringify(v)); }catch(e){} },
+  del(k){ try{ localStorage.removeItem("cosLab:" + k); }catch(e){} }
+};
+let toastT;
+function toast(t){ const e = $("toast"); e.textContent = t; e.style.display = "block"; clearTimeout(toastT); toastT = setTimeout(()=> e.style.display = "none", 2800); }
+
+let state = { grade: store.get("grade", "3급"), set: store.get("set", 0), q: 1 };
+if(!CONFIG.grades[state.grade] || !CONFIG.grades[state.grade].data) state.grade = "3급";
+if(state.set >= CONFIG.grades[state.grade].sets.length) state.set = 0;
+const G = () => CONFIG.grades[state.grade];
+const kk = (p, q = state.q) => `${p}|${state.grade}|${state.set}|${q}`;
+const workKey = q => kk("work", q);
+const entKey = (kind, q = state.q) => `${G().data}/s${state.set + 1}/${kind}/${nn(q)}.ent`;
+const fileTag = () => `${state.grade}_${G().sets[state.set].replace(/\s+/g,"_")}_${nn(state.q)}`;
+
+/* ---------- 아래 바 ---------- */
+function renderBar(){
+  const gs = $("gradeSel"); gs.innerHTML = "";
+  Object.keys(CONFIG.grades).forEach(g=>{
+    const o = document.createElement("option"); o.value = g;
+    o.textContent = "Entry " + g + (CONFIG.grades[g].data ? "" : " (준비 중)");
+    o.disabled = !CONFIG.grades[g].data; gs.appendChild(o);
+  });
+  gs.value = state.grade;
+  const ss = $("setSel"); ss.innerHTML = "";
+  G().sets.forEach((s, i)=>{ const o = document.createElement("option"); o.value = i; o.textContent = s; ss.appendChild(o); });
+  ss.value = state.set;
+  renderNums(); renderAnswerBtn();
+}
+function renderNums(){
+  const box = $("qnums"); box.innerHTML = "";
+  for(let i = 1; i <= G().problems; i++){
+    const b = document.createElement("button"); b.textContent = i;
+    if(i === state.q) b.className = "on";
+    const res = store.get(kk("result", i), null);
+    const st = res && res.score >= 100 ? "ok" : (store.get(workKey(i), null) ? "doing" : "");
+    const d = document.createElement("span"); d.className = "dot " + st; b.appendChild(d);
+    b.title = i + "번 문제";
+    b.onclick = ()=> go(()=>{ state.q = i; });
+    box.appendChild(b);
+  }
+}
+const fails = () => store.get(kk("fails"), 0);
+const answerUnlocked = () => TEACHER || fails() >= UNLOCK_AFTER || (store.get(kk("result"), null) || {}).score >= 100;
+function renderAnswerBtn(){
+  $("bAnswer").textContent = reviewMode ? "내 풀이로" : (answerUnlocked() ? "정답 보기" : "정답 보기 🔒");
+}
+$("gradeSel").onchange = e => { const g = e.target.value; go(()=>{ state.grade = g; state.set = 0; state.q = 1; store.set("grade", g); store.set("set", 0); }); };
+$("setSel").onchange = e => { const v = +e.target.value; go(()=>{ state.set = v; state.q = 1; store.set("set", v); }); };
+
+async function go(mutate){
+  await saveCurrent();
+  mutate(); pdfScaleReset();
+  renderBar(); renderPdf(); openProblem();
+}
+
+/* 더보기 메뉴 */
+$("bMore").onclick = e => { e.stopPropagation(); $("menu").classList.toggle("on"); };
+document.addEventListener("click", e => { if(!$("menu").contains(e.target)) $("menu").classList.remove("on"); });
+$("teacherMenu").hidden = !TEACHER;
+$("mExam").onclick = async ()=> { await saveCurrent(); location.href = "exam.html"; };
+
+/* ---------- 문제지 ---------- */
+const pdfBox = $("pdf");
+let pScale = store.get("pzoom", 1), pdfToken = 0;
+function applyPScale(){
+  pdfBox.querySelectorAll("img").forEach(img => img.style.width = Math.round(pScale * 100) + "%");
+  $("pVal").textContent = Math.round(pScale * 100) + "%";
+}
+function pdfScaleReset(){}
+$("pMinus").onclick = ()=> { pScale = Math.max(0.5, Math.round((pScale - 0.1) * 100) / 100); store.set("pzoom", pScale); applyPScale(); };
+$("pPlus").onclick  = ()=> { pScale = Math.min(3, Math.round((pScale + 0.1) * 100) / 100); store.set("pzoom", pScale); applyPScale(); };
+async function renderPdf(){
+  const token = ++pdfToken;
+  pdfBox.replaceChildren(); pdfBox.scrollTop = 0;
+  const base = `${G().data}/s${state.set + 1}/problem/${nn(state.q)}`;
+  $("openPdf").onclick = ()=> window.open(base + ".pdf", "_blank");
+  try{
+    if(!(window.__PAGES && window.__PAGES[base])) await loadScript(G().data + "/pages.js");
+    if(token !== pdfToken) return;
+    const files = (window.__PAGES && window.__PAGES[base]) || [];
+    if(!files.length) throw 0;
+    const dir = base.slice(0, base.lastIndexOf("/") + 1);
+    files.forEach((f, i)=>{ const img = document.createElement("img"); img.src = dir + f; img.alt = `${state.q}번 문제 ${i + 1}쪽`; pdfBox.append(img); });
+    applyPScale();
+  }catch(e){ if(token === pdfToken) pdfBox.innerHTML = '<div class="note">문제 그림을 불러오지 못했어요.</div>'; }
+}
+
+/* ---------- 엔트리 화면 · 배율 · 분할 ---------- */
+const frame = $("entryFrame"), right = $("right");
+let eScale = store.get("ezoom", null);
+function autoScale(){ return Math.round(Math.max(0.55, Math.min(1, right.clientWidth / 1150)) / 0.05) * 0.05; }
+function resizeEntry(){
+  const w = right.clientWidth, h = right.clientHeight;
+  const z = eScale || autoScale(); $("eVal").textContent = Math.round(z * 100) + "%";
+  if(!w || !h) return;
+  frame.style.width = (w / z) + "px"; frame.style.height = (h / z) + "px"; frame.style.transform = `scale(${z})`;
+  $("eVal").textContent = Math.round(z * 100) + "%";
+}
+const stepE = d => { eScale = Math.min(1.2, Math.max(0.5, Math.round(((eScale || autoScale()) + d) * 100) / 100)); store.set("ezoom", eScale); resizeEntry(); };
+$("eMinus").onclick = ()=> stepE(-0.05); $("ePlus").onclick = ()=> stepE(0.05);
+new ResizeObserver(resizeEntry).observe(right);
+window.addEventListener("resize", resizeEntry);
+(function(){
+  const split = $("split"), left = $("left"); let drag = false;
+  split.onpointerdown = e => { drag = true; split.setPointerCapture(e.pointerId); split.classList.add("drag"); frame.style.pointerEvents = "none"; };
+  split.onpointermove = e => { if(drag) left.style.width = Math.min(60, Math.max(18, e.clientX / innerWidth * 100)) + "%"; };
+  const end = ()=> { drag = false; split.classList.remove("drag"); frame.style.pointerEvents = ""; };
+  split.onpointerup = end; split.onpointercancel = end;
+})();
+
+/* ---------- 엔트리 편집기 연결 ---------- */
+let entReady = false, loadedKey = null, openToken = 0, seq = 0, reviewMode = false;
+const pending = {};
+window.addEventListener("message", e => {
+  if(e.source !== frame.contentWindow) return;
+  const m = e.data || {};
+  if(m.type === "entry-ready"){ entReady = true; openProblem(); return; }
+  if(m.id && pending[m.id]){ pending[m.id](m); delete pending[m.id]; }
+});
+function call(type, payload = {}, transfer = [], timeout = 20000){
+  return new Promise((resolve, reject)=>{
+    const id = ++seq;
+    const t = setTimeout(()=>{ delete pending[id]; reject(new Error("엔트리 응답이 없어요")); }, timeout);
+    pending[id] = m => { clearTimeout(t); m.type === "error" ? reject(new Error(m.message)) : resolve(m); };
+    frame.contentWindow.postMessage(Object.assign({type, id}, payload), "*", transfer);
+  });
+}
+const entCache = {};
+function loadScript(src){
+  return new Promise((res, rej)=>{ const s = document.createElement("script"); s.src = src; s.onload = res; s.onerror = ()=> rej(new Error("파일을 찾을 수 없어요: " + src)); document.head.appendChild(s); });
+}
+async function getEnt(kind, q = state.q){
+  const k = entKey(kind, q);
+  if(!entCache[k]){
+    if(!(window.__ENT && window.__ENT[k])) await loadScript(k.replace(/\.ent$/, ".js"));
+    const b64 = window.__ENT && window.__ENT[k];
+    if(!b64) throw new Error("자료 형식 오류");
+    const bin = atob(b64), u8 = new Uint8Array(bin.length);
+    for(let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+    entCache[k] = u8.buffer; delete window.__ENT[k];
+  }
+  return entCache[k];
+}
+function download(buf, name){
+  const url = URL.createObjectURL(new Blob([buf], {type:"application/octet-stream"}));
+  const a = document.createElement("a"); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=> URL.revokeObjectURL(url), 1500);
+}
+async function openProblem(){
+  if(!entReady) return;
+  const token = ++openToken, k = workKey(state.q);
+  loadedKey = null; reviewMode = false; renderAnswerBtn();
+  try{
+    const buf = await getEnt("start");
+    if(token !== openToken) return;
+    const copy = buf.slice(0);
+    await call("load", {buf: copy, saved: store.get(k, null)}, [copy]);
+    if(token !== openToken) return;
+    loadedKey = k;
+  }catch(err){ toast("불러오기 실패: " + err.message); }
+}
+async function saveCurrent(){
+  if(!entReady || !loadedKey) return;
+  try{ const r = await call("export-json", {}, [], 5000); store.set(loadedKey, r.json); }catch(e){}
+}
+setInterval(saveCurrent, 10000);
+window.addEventListener("beforeunload", ()=> { saveCurrent(); });
+
+$("mRedo").onclick = ()=> {
+  $("menu").classList.remove("on");
+  if(!confirm("이 문제를 처음 상태부터 다시 풀까요? 지금까지 푼 내용은 사라져요.")) return;
+  store.del(workKey(state.q)); store.del(kk("result")); store.del(kk("fails"));
+  renderBar(); openProblem();
+};
+$("dlStart").onclick  = async ()=> { try{ download(await getEnt("start"),  fileTag() + "_풀이.ent"); }catch(e){ toast(e.message); } };
+$("dlAnswer").onclick = async ()=> { try{ download(await getEnt("answer"), fileTag() + "_정답.ent"); }catch(e){ toast(e.message); } };
+$("dlExport").onclick = async ()=> {
+  if(reviewMode){ toast("정답 보기 중에는 저장할 수 없어요."); return; }
+  try{ await saveCurrent(); const r = await call("export-ent"); download(r.buf, "답안_" + fileTag() + ".ent"); }catch(e){ toast("내려받기 실패: " + e.message); }
+};
+
+/* ---------- 채점 ---------- */
+async function gradeProblem(q){
+  if(q === state.q) await saveCurrent();
+  const saved = store.get(workKey(q), null);
+  if(!saved) return {q, score:0, correct:0, total:1, checks:[{label:"저장한 답안이 없어요 (문제를 열지 않았어요)", ok:false}]};
+  const [sb, ab] = await Promise.all([getEnt("start", q), getEnt("answer", q)]);
+  const r = CosGrader.grade(CosGrader.readProject(sb), CosGrader.readProject(ab), JSON.parse(saved));
+  store.set(kk("result", q), {score: r.score, at: Date.now()});
+  return Object.assign({q}, r);
+}
+const scoreClass = s => s >= 100 ? "s100" : (s <= 0 ? "s0" : "smid");
+function showDetail(r){
+  $("rpDetailTitle").textContent = `${r.q}번 문제 · 맞은 항목 ${r.correct}/${r.total}`;
+  const ul = $("rpChecks"); ul.replaceChildren();
+  r.checks.forEach(c=>{
+    const li = document.createElement("li"); li.className = c.ok ? "ok" : "no";
+    li.innerHTML = `<b>${c.ok ? "✓" : "✗"}</b><span></span>`;
+    li.querySelector("span").textContent = c.label; ul.append(li);
+  });
+}
+function showReport(results, all, extraNote){
+  const total = results.reduce((a, r)=> a + r.score, 0), max = results.length * 100;
+  $("rpTitle").textContent = all ? `${state.grade} ${G().sets[state.set]} · 전체 채점` : `${results[0].q}번 문제 채점`;
+  $("rpHero").innerHTML = all ? `${total}<small> / ${max}점</small>` : `${results[0].score}<small>점 (맞은 항목 ${results[0].correct}/${results[0].total})</small>`;
+  $("rpNote").textContent = (extraNote ? extraNote + " " : "") + "자체 연습 채점입니다. 시작 파일에서 고쳐야 하는 블록의 종류·순서·입력값을 정답과 비교하며, 블록 위치는 무시해요. 동작이 같은 다른 풀이나 공식 시험의 부분 점수는 반영하지 않아요.";
+  const grid = $("rpGrid"); grid.replaceChildren(); grid.hidden = !all;
+  if(all) results.forEach((r, i)=>{
+    const b = document.createElement("button"); b.className = scoreClass(r.score); b.textContent = `${r.q}번 · ${r.score}점`;
+    b.onclick = ()=> { grid.querySelectorAll("button").forEach(x=> x.classList.remove("on")); b.classList.add("on"); showDetail(r); };
+    grid.append(b); if(i === 0) b.click();
+  });
+  if(!all) showDetail(results[0]);
+  const dlg = $("report"); if(!dlg.open) dlg.showModal();
+}
+$("rpClose").onclick = ()=> $("report").close();
+
+$("bGrade").onclick = async ()=> {
+  if(reviewMode){ toast("정답 보기 중이에요. '내 풀이로'를 눌러 돌아와 주세요."); return; }
+  try{
+    const r = await gradeProblem(state.q);
+    if(r.score >= 100) store.del(kk("fails")); else store.set(kk("fails"), fails() + 1);
+    renderNums(); renderAnswerBtn();
+    showReport([r], false);
+  }catch(e){ toast("채점 실패: " + e.message); }
+};
+$("mAll").onclick = async ()=> {
+  $("menu").classList.remove("on");
+  try{
+    const results = [];
+    for(let q = 1; q <= G().problems; q++) results.push(await gradeProblem(q));
+    renderNums(); showReport(results, true);
+  }catch(e){ toast("채점 실패: " + e.message); }
+};
+
+/* 정답 보기 */
+$("bAnswer").onclick = async ()=> {
+  if(reviewMode){ await openProblem(); return; }
+  if(!answerUnlocked()) return;
+  if(!confirm("정답 파일을 편집기에 열어요. 지금까지 푼 내용은 저장돼 있어서 '내 풀이로'를 누르면 돌아올 수 있어요. 계속할까요?")) return;
+  try{
+    await saveCurrent();
+    const copy = (await getEnt("answer")).slice(0);
+    loadedKey = null; reviewMode = true;
+    store.set(kk("usedAns"), true);
+    await call("load", {buf: copy, saved: null}, [copy]);
+    renderAnswerBtn();
+  }catch(e){ reviewMode = false; toast("정답을 열지 못했어요: " + e.message); openProblem(); }
+};
+
+resizeEntry(); renderBar(); renderPdf();
+</script>
+</body>
+</html>

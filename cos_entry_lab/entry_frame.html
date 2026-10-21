@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="ko">
+<meta charset="utf-8">
+<style>
+  html,body,#entryContainer{height:100%;width:100%;margin:0}
+  #load{position:fixed;inset:0;background:#f5f7fa;display:grid;place-content:center;font:16px sans-serif;z-index:100000;text-align:center;line-height:1.7;padding:20px}
+</style>
+<link rel="stylesheet" href="https://playentry.org/lib/entry-tool/dist/entry-tool.css">
+<link rel="stylesheet" href="https://playentry.org/lib/entry-js/dist/entry.css">
+<link rel="stylesheet" href="https://playentry.org/lib/entry-lms/dist/assets/app.css">
+
+<div id="load">엔트리 편집기를 불러오는 중입니다…<br><small>인터넷 연결이 필요해요</small></div>
+<div id="entryContainer"></div>
+
+<script src="https://playentry.org/lib/entry-js/extern/lang/ko.js"></script>
+<script src="https://playentry.org/lib/lodash/lodash.min.js"></script>
+<script src="https://playentry.org/js/ws/locales.js"></script>
+<script src="https://playentry.org/js/react18/react.production.min.js"></script>
+<script src="https://playentry.org/js/react18/react-dom.production.min.js"></script>
+<script src="https://playentry.org/lib/PreloadJS/lib/preloadjs-0.6.0.min.js"></script>
+<script src="https://playentry.org/lib/EaselJS/lib/easeljs-0.8.0.min.js"></script>
+<script src="https://playentry.org/lib/SoundJS/lib/soundjs-0.6.0.min.js"></script>
+<script src="https://playentry.org/lib/SoundJS/lib/flashaudioplugin-0.6.0.min.js"></script>
+<script src="https://playentry.org/lib/jquery/jquery.min.js"></script>
+<script src="https://playentry.org/lib/jquery-ui/jquery-ui.min.js"></script>
+<script src="https://playentry.org/lib/velocity/velocity.min.js"></script>
+<script src="https://playentry.org/lib/codemirror/lib/codemirror.js"></script>
+<script src="https://playentry.org/lib/codemirror/addon/hint/show-hint.js"></script>
+<script src="https://playentry.org/lib/codemirror/addon/lint/lint.js"></script>
+<script src="https://playentry.org/lib/codemirror/addon/selection/active-line.js"></script>
+<script src="https://playentry.org/lib/codemirror/mode/javascript/javascript.js"></script>
+<script src="https://playentry.org/lib/codemirror/addon/hint/javascript-hint.js"></script>
+<script src="https://playentry.org/js/ws/jshint.js"></script>
+<script src="https://playentry.org/lib/fuzzy/lib/fuzzy.js"></script>
+<script src="https://playentry.org/js/ws/python.js"></script>
+<script src="https://playentry.org/lib/socket.io-client/socket.io.js"></script>
+<script src="https://playentry.org/lib/entry-js/extern/util/filbert.js"></script>
+<script src="https://playentry.org/lib/entry-js/extern/util/CanvasInput.js"></script>
+<script src="https://playentry.org/lib/entry-js/extern/util/ndgmr.Collision.js"></script>
+<script src="https://playentry.org/lib/entry-js/extern/util/handle.js"></script>
+<script src="https://playentry.org/lib/entry-js/extern/util/bignumber.min.js"></script>
+<script src="https://playentry.org/lib/components-webfontloader/webfontloader.js"></script>
+<script src="https://playentry.org/lib/entry-lms/dist/assets/app.js"></script>
+<script src="https://playentry.org/lib/entry-js/extern/util/static.js"></script>
+<script src="https://playentry.org/lib/entry-tool/dist/entry-tool.js"></script>
+<script src="https://playentry.org/lib/entry-paint/dist/static/js/entry-paint.js"></script>
+<script src="https://playentry.org/external/sound/sound-editor.js"></script>
+<script src="https://playentry.org/module/legacy-video/index.js"></script>
+<script src="https://playentry.org/lib/entry-js/dist/entry.min.js"></script>
+<script src="vendor/fflate.js"></script>
+<script src="vendor/entry-media.js"></script>
+
+<script>
+/* 연습실 본문(부모 페이지)과 postMessage로 통신합니다.
+   부모 → 여기:  {type:'load', id, buf(ENT bytes), saved(저장된 project JSON 문자열|null)}
+                {type:'export-json', id}   현재 작업을 JSON 문자열로
+                {type:'export-ent', id}    현재 작업을 ENT 파일 bytes로
+   여기 → 부모:  {type:'entry-ready'}, {id, type:'loaded'|'json'|'ent'|'error', ...} */
+(function(){
+  var TD = new TextDecoder(), TE = new TextEncoder();
+  /* 폴더 이름이 16진수가 아닌 경우(dl/6k 등)도 인식해야 합니다 */
+  var ASSET_RE = /temp\/[^\/\\]+\/[^\/\\]+\/(?:image|thumb|sound)\/[^\/\\]+$/i;
+  var MIME = {png:'image/png',jpg:'image/jpeg',jpeg:'image/jpeg',gif:'image/gif',svg:'image/svg+xml',bmp:'image/bmp',
+              mp3:'audio/mpeg',wav:'audio/wav',ogg:'audio/ogg'};
+  var base = null;      // {entries, projEntry, urlOrig}
+  var blobUrls = [];
+
+  function mapStrings(v, fn){
+    if(Array.isArray(v)) return v.map(function(x){ return mapStrings(x, fn); });
+    if(v && typeof v === 'object'){ var o = {}; Object.keys(v).forEach(function(k){ o[k] = mapStrings(v[k], fn); }); return o; }
+    return typeof v === 'string' ? fn(v) : v;
+  }
+
+  /* ---- tar 읽기/쓰기 ---- */
+  function parseTar(u8){
+    var out = [], off = 0;
+    while(off + 512 <= u8.length){
+      var h = u8.subarray(off, off + 512), allZero = true;
+      for(var i=0;i<512;i++){ if(h[i] !== 0){ allZero = false; break; } }
+      if(allZero) break;
+      var str = function(a,b){ var s = TD.decode(h.subarray(a,b)); var z = s.indexOf('\0'); return z >= 0 ? s.slice(0,z) : s; };
+      var name = str(0,100), prefix = str(345,500);
+      if(prefix) name = prefix + '/' + name;
+      var size = parseInt(str(124,136).trim() || '0', 8);
+      var type = str(156,157) || '0';
+      off += 512;
+      out.push({name:name, type:type, data:u8.slice(off, off + size)});
+      off += Math.ceil(size / 512) * 512;
+    }
+    return out;
+  }
+  function writeTar(entries){
+    var blocks = [], total = 0;
+    entries.forEach(function(e){
+      var h = new Uint8Array(512);
+      var put = function(s, o, len){ var b = TE.encode(s); h.set(b.subarray(0, len), o); };
+      var name = e.name, prefix = '';
+      if(TE.encode(name).length > 100){
+        var idx = name.lastIndexOf('/');
+        while(idx > 0 && (TE.encode(name.slice(idx+1)).length > 100 || TE.encode(name.slice(0,idx)).length > 155)) idx = name.lastIndexOf('/', idx - 1);
+        if(idx > 0){ prefix = name.slice(0, idx); name = name.slice(idx + 1); }
+      }
+      var isDir = e.type === '5', size = isDir ? 0 : e.data.length;
+      put(name, 0, 100);
+      put(isDir ? '0000755\0' : '0000644\0', 100, 8);
+      put('0000000\0', 108, 8); put('0000000\0', 116, 8);
+      put(('00000000000' + size.toString(8)).slice(-11) + '\0', 124, 12);
+      put(('00000000000' + Math.floor(Date.now()/1000).toString(8)).slice(-11) + '\0', 136, 12);
+      put('        ', 148, 8);
+      put(isDir ? '5' : '0', 156, 1);
+      put('ustar\0', 257, 6); put('00', 263, 2);
+      put(prefix, 345, 155);
+      var sum = 0; for(var i=0;i<512;i++) sum += h[i];
+      put(('000000' + sum.toString(8)).slice(-6) + '\0 ', 148, 8);
+      blocks.push(h); total += 512;
+      if(size){ blocks.push(e.data); var pad = (512 - size % 512) % 512; total += size; if(pad){ blocks.push(new Uint8Array(pad)); total += pad; } }
+    });
+    blocks.push(new Uint8Array(1024)); total += 1024;
+    var out = new Uint8Array(total), p = 0;
+    blocks.forEach(function(b){ out.set(b, p); p += b.length; });
+    return out;
+  }
+
+  /* ---- 불러오기 / 내보내기 ---- */
+  async function loadEnt(buf, savedJson){
+    var entries = parseTar(fflate.gunzipSync(new Uint8Array(buf)));
+    var projEntry = entries.filter(function(e){ return /(^|\/)project\.json$/.test(e.name); })[0];
+    if(!projEntry) throw new Error('ENT 안에 project.json이 없어요.');
+    blobUrls.forEach(function(u){ URL.revokeObjectURL(u); }); blobUrls = [];
+    var byRel = {};
+    entries.forEach(function(e){
+      if(e.type !== '0' && e.type !== '') return;
+      var m = e.name.match(ASSET_RE); if(!m) return;
+      var ext = (e.name.split('.').pop() || '').toLowerCase();
+      var url = URL.createObjectURL(new Blob([e.data], {type: MIME[ext] || 'application/octet-stream'}));
+      byRel[m[0]] = url; blobUrls.push(url);
+    });
+    base = {entries: entries, projEntry: projEntry, urlOrig: {}};
+    var stats = {linked: 0, missing: []};
+    var MEDIA_RE = /\/images\/media\/([^\/\\?#]+)$/;
+    var ASSETLIKE = /\.(?:png|jpe?g|gif|svg|bmp|mp3|wav|ogg)(?:[?#].*)?$/i;
+    function localize(s){
+      if(s.indexOf('blob:') === 0 || s.indexOf('data:') === 0 || !ASSETLIKE.test(s)) return s;
+      var n = s; try{ n = decodeURIComponent(s); }catch(e){}
+      n = n.replace(/\\/g, '/');
+      if(n.indexOf('/') < 0) return s;           // ".mp3" 같은 확장자 글자는 경로가 아님
+      var m = n.match(ASSET_RE), url = m && byRel[m[0]];
+      if(!url){                                   // 엔트리 기본 로봇/소리
+        var mm = n.match(MEDIA_RE);
+        if(mm && window.__MEDIA && window.__MEDIA[mm[1]]) url = window.__MEDIA[mm[1]];
+      }
+      if(url){ if(!base.urlOrig[url]) base.urlOrig[url] = s; stats.linked++; return url; }
+      if(!/^https?:/i.test(s)) stats.missing.push(s);
+      return s;
+    }
+    var project = mapStrings(JSON.parse(savedJson || TD.decode(projEntry.data)), localize);
+    (project.objects || []).forEach(function(o){
+      o.lock = false;
+      ((o.sprite && o.sprite.pictures) || []).forEach(function(pic){
+        var f = pic.fileurl || '';
+        if(f.indexOf('blob:') === 0 || f.indexOf('data:') === 0){ pic.thumbUrl = f; pic.thumbnail = f; }
+      });
+    });
+    if(Entry.clearProject) Entry.clearProject();
+    await Entry.loadProject(project);
+    return stats;
+  }
+  function exportJson(){
+    if(!base) throw new Error('불러온 프로젝트가 없어요.');
+    return mapStrings(Entry.exportProject(), function(s){ return base.urlOrig[s] || s; });
+  }
+  function exportEnt(){
+    var json = exportJson();
+    var entries = base.entries.map(function(e){
+      return e === base.projEntry ? {name:e.name, type:e.type, data:TE.encode(JSON.stringify(json))} : e;
+    });
+    return fflate.gzipSync(writeTar(entries)).buffer;
+  }
+
+  window.addEventListener('message', async function(ev){
+    if(ev.source !== parent) return;
+    var m = ev.data || {};
+    var reply = function(d, t){ parent.postMessage(Object.assign({id: m.id}, d), '*', t || []); };
+    try{
+      if(m.type === 'load'){
+        var st = await loadEnt(m.buf, m.saved);
+        reply({type:'loaded', linked: st.linked, missingCount: st.missing.length, missing: st.missing.slice(0, 5)});
+      }
+      else if(m.type === 'export-json'){ reply({type:'json', json: JSON.stringify(exportJson())}); }
+      else if(m.type === 'export-ent'){ var b = exportEnt(); reply({type:'ent', buf:b}, [b]); }
+    }catch(e){ console.error(e); reply({type:'error', message: e.message || String(e)}); }
+  });
+
+  /* ---- 엔트리 시작 ---- */
+  try{
+    Entry.creationChangedEvent = new Entry.Event(window);
+    Entry.init(document.getElementById('entryContainer'), {
+      type:'workspace', libDir:'https://playentry.org/lib', entryDir:'/entry-js',
+      resourcePath:'https://playentry.org/', textCodingEnable:false
+    });
+    Entry.loadProject();
+    document.getElementById('load').remove();
+    parent.postMessage({type:'entry-ready'}, '*');
+  }catch(e){
+    document.getElementById('load').innerHTML = '엔트리를 불러오지 못했어요.<br><small>' + (e.message || e) + '<br>인터넷 연결을 확인하고 새로고침해 주세요.</small>';
+    console.error(e);
+  }
+})();
+</script>
