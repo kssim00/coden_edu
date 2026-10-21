@@ -1,0 +1,540 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>COS 엔트리 · 시험 모드</title>
+<style>
+:root{--or:#f6a65a;--or-d:#e08a35;--or-l:#fff1e0;--ink:#2b2b2b;--blue:#1f6fe0;--red:#d6453d;--grn:#1f9d55;--line:#e3d3bf}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;font:15px/1.5 "Malgun Gothic","Apple SD Gothic Neo",sans-serif;color:var(--ink);background:#fff}
+button{font:inherit;cursor:pointer}
+button:disabled{opacity:.45;cursor:not-allowed}
+.screen{display:none;height:100vh;height:100dvh}
+.screen.on{display:flex}
+
+/* 시작 · 결과 화면 */
+#start,#result{align-items:center;justify-content:center;background:var(--or-l);overflow:auto;padding:24px}
+.card{background:#fff;border:2px solid var(--or);border-radius:16px;padding:28px 32px;width:min(560px,100%);box-shadow:0 6px 24px #0001}
+.card h1{margin:0 0 4px;font-size:24px}
+.card .sub{color:#777;margin-bottom:18px;font-size:13px}
+.field{display:grid;grid-template-columns:90px 1fr;gap:10px;align-items:center;margin:10px 0}
+.field label{font-weight:700}
+.field input,.field select{padding:9px 10px;border:1px solid #cdbba5;border-radius:8px;font:inherit;width:100%}
+.btn{border:0;border-radius:10px;padding:10px 18px;font-weight:700;background:var(--or);color:#fff}
+.btn:hover:not(:disabled){background:var(--or-d)}
+.btn.ghost{background:#fff;color:#8a5a22;border:1px solid var(--or)}
+.btn.ghost:hover:not(:disabled){background:var(--or-l)}
+.btn.big{width:100%;padding:13px;font-size:17px;margin-top:14px}
+.links{display:flex;justify-content:space-between;margin-top:14px;font-size:13px}
+.links a,.linkbtn{color:#8a5a22;background:none;border:0;padding:0;text-decoration:underline;cursor:pointer}
+.resume{background:#fff7e8;border:1px dashed var(--or-d);border-radius:10px;padding:10px 12px;margin:12px 0;font-size:14px}
+
+/* 시험 화면 */
+#exam{flex-direction:column}
+#examMain{flex:1;display:flex;min-height:0;position:relative}
+#gate{position:absolute;inset:0;background:var(--or-l);z-index:30;display:none;align-items:center;justify-content:center;flex-direction:column;gap:14px;text-align:center}
+#gate.on{display:flex}
+#gate h2{margin:0;font-size:26px}
+#gate p{margin:0;color:#7a4a12}
+#gate .btn{font-size:20px;padding:14px 40px}
+#left{width:30%;min-width:240px;background:var(--or-l);border-right:1px solid var(--line);overflow:auto}
+#left{position:relative}
+#left img{display:block;height:auto;margin:0 auto}
+.zoomctl{position:absolute;right:12px;bottom:12px;background:#fff6;border:1px solid #0001;opacity:.5;transition:opacity .15s;border-radius:20px;padding:3px 6px;display:flex;align-items:center;gap:2px;font-weight:700;font-size:13px;z-index:5;box-shadow:none}
+.zoomctl:hover{opacity:1;background:#fffe}
+.zoomctl button{border:0;background:none;width:26px;height:26px;border-radius:50%;font-size:16px;color:#7a4a12}
+.zoomctl button:hover{background:var(--or-l)}
+.zoomctl span{min-width:42px;text-align:center}
+#pzoom{right:auto;left:12px;position:fixed;bottom:70px}
+#left{overflow:auto}
+#left .note{padding:20px;color:#8a5a22}
+#split{width:7px;cursor:col-resize;background:#ecd9c0;flex:none}
+#split:hover,#split.drag{background:var(--or)}
+#right{flex:1;min-width:0;position:relative;overflow:hidden;background:#f2f4f8}
+#entryFrame{border:0;transform-origin:0 0;position:absolute;left:0;top:0;background:#fff}
+#bar{flex:none;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:12px 18px;background:var(--or);color:#3b2406;padding:8px 16px;min-height:56px}
+#bar .who b{font-size:16px}
+#bar .center{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+#bar .btns{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+#barSkip{color:#b3170f;margin-left:6px}
+@media (max-width:900px){#bar{grid-template-columns:1fr}#bar .btns,#bar .center{justify-content:center}}
+#bar .pill{background:#fff8;border-radius:20px;padding:4px 14px;font-weight:700;white-space:nowrap}
+#time.low{color:#b3170f}
+#bar .btn{background:#fff;color:#7a4a12;border:1px solid #fff;padding:8px 16px;white-space:nowrap}
+#bar .btn:hover:not(:disabled){background:var(--or-l)}
+#bar .btn.go{background:#3b2406;color:#fff}
+#bar .btn.go:hover:not(:disabled){background:#000}
+#toast{position:fixed;left:50%;bottom:76px;transform:translateX(-50%);background:#333;color:#fff;padding:8px 16px;border-radius:20px;display:none;z-index:50;font-size:14px}
+
+/* 결과 */
+#result .card{width:min(720px,100%)}
+.hero{display:flex;align-items:baseline;gap:14px;margin:8px 0 14px}
+.hero .big{font-size:52px;font-weight:800;color:var(--or-d)}
+.grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin:10px 0}
+.cell{border:2px solid var(--line);border-radius:10px;padding:8px 4px;text-align:center;background:#fff}
+.cell.ok{border-color:var(--grn);background:#eefaf2}
+.cell.bad{border-color:var(--red);background:#fdeeed}
+.cell.fixed{border-color:var(--blue);background:#eef4ff}
+.cell b{display:block;font-size:13px;color:#666}
+.cell span{font-size:20px;font-weight:800}
+.cell small{display:block;font-size:11px;color:#777;min-height:14px}
+.row{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+dialog{border:2px solid var(--or);border-radius:14px;padding:20px 22px;max-width:min(520px,92vw)}
+dialog::backdrop{background:#0006}
+dialog ul{padding-left:18px;margin:8px 0;max-height:46vh;overflow:auto}
+.ok-t{color:var(--grn)} .bad-t{color:var(--red)}
+</style>
+</head>
+<body>
+
+<!-- 1. 시작 화면 -->
+<section id="start" class="screen on">
+  <div class="card">
+    <h1>COS 엔트리 시험 모드</h1>
+    <div class="sub">실제 시험처럼 1번부터 풀고, 제출한 뒤 틀린 문제를 다시 풀어요 · 비공식 연습</div>
+    <div class="field"><label for="selGrade">급수</label><select id="selGrade"></select></div>
+    <div class="field"><label for="selSet">세트</label><select id="selSet"></select></div>
+    <div class="field"><label for="inName">이름</label><input id="inName" placeholder="홍길동" autocomplete="off"></div>
+    <div class="field"><label for="inId">아이디</label><input id="inId" placeholder="hong (선택)" autocomplete="off"></div>
+    <div id="resumeBox" class="resume" hidden></div>
+    <button class="btn big" id="btnBegin">시험 시작</button>
+    <div class="links"><a href="index.html">← 연습 모드(문제 골라 풀기)</a><button class="linkbtn" id="btnCsv">기록 CSV 내려받기</button></div>
+  </div>
+</section>
+
+<!-- 2. 시험 화면 -->
+<section id="exam" class="screen">
+  <div id="examMain">
+    <div id="gate"><h2 id="gateTitle"></h2><p id="gateInfo"></p><button class="btn" id="gateGo">시험 시작</button></div>
+    <div id="left"></div>
+    <div class="zoomctl" id="pzoom"><button id="pMinus">−</button><span id="pVal">100%</span><button id="pPlus">＋</button></div>
+    <div id="split"></div>
+    <div id="right"><iframe id="entryFrame" title="엔트리 편집기"></iframe>
+      <div class="zoomctl" id="ezoom"><button id="eMinus">−</button><span id="eVal">75%</span><button id="ePlus">＋</button></div></div>
+  </div>
+  <div id="bar">
+    <div class="who"><span id="barGrade"></span> · <b id="barName"></b></div>
+    <div class="center">
+      <div class="pill">⏳ 남은시간 <span id="time">--:--</span></div>
+      <div class="pill">⌨ <span id="barProg"></span><span id="barSkip"></span></div>
+    </div>
+    <div class="btns">
+      <button class="btn" id="bRedo">다시풀기</button>
+      <button class="btn" id="bSkip">건너뛰기</button>
+      <button class="btn" id="bAnswer" hidden>정답 보기</button>
+      <button class="btn go" id="bGrade" hidden>채점하기</button>
+      <button class="btn go" id="bNext">다음문제</button>
+    </div>
+  </div>
+</section>
+
+<!-- 3. 결과 화면 -->
+<section id="result" class="screen">
+  <div class="card">
+    <h1 id="rTitle">시험 결과</h1>
+    <div class="sub" id="rSub"></div>
+    <div class="hero"><div class="big" id="rScore">0</div><div id="rNote"></div></div>
+    <div class="grid" id="rGrid"></div>
+    <div class="sub">문제 칸을 누르면 항목별 채점 결과를 볼 수 있어요. 초록=정답, 빨강=오답, 파랑=다시 풀어 맞힘</div>
+    <div class="row">
+      <button class="btn" id="rRetry">틀린 문제 풀기</button>
+      <button class="btn ghost" id="rHome">처음 화면으로</button>
+    </div>
+  </div>
+</section>
+
+<dialog id="dlg"><h3 id="dlgTitle" style="margin:0 0 6px"></h3><ul id="dlgList"></ul><div class="row" style="justify-content:flex-end"><button class="btn ghost" id="dlgClose">닫기</button><button class="btn" id="dlgNext" hidden>다음 틀린 문제</button></div></dialog>
+<div id="toast"></div>
+
+<script src="vendor/fflate.js"></script>
+<script src="grader.js"></script>
+<script>
+const CONFIG = { grades: {
+  "4급": { minutes: 40, sets: ["1회","2회","3회"], problems: 10, data: "data/4" },
+  "3급": { minutes: 40, sets: ["1회 (최신기출)","2회","3회"], problems: 10, data: "data/3" },
+  "2급": { minutes: 50, sets: ["1회 (최신기출)","2회","3회"], problems: 10, data: "data/2" },
+  "1급": { minutes: 50, sets: ["1회 (최신기출)","2회","3회"], problems: 10, data: "data/1" } } };
+
+const $ = id => document.getElementById(id);
+const nn = n => String(n).padStart(2, "0");
+const store = {
+  get(k, d){ try{ const v = localStorage.getItem("cosLab:" + k); return v === null ? d : JSON.parse(v); }catch(e){ return d; } },
+  set(k, v){ try{ localStorage.setItem("cosLab:" + k, JSON.stringify(v)); }catch(e){} },
+  del(k){ try{ localStorage.removeItem("cosLab:" + k); }catch(e){} }
+};
+const show = id => { document.querySelectorAll(".screen").forEach(s => s.classList.toggle("on", s.id === id)); if(id === "exam") requestAnimationFrame(resizeEntry); };
+let toastT;
+function toast(t){ const e = $("toast"); e.textContent = t; e.style.display = "block"; clearTimeout(toastT); toastT = setTimeout(()=> e.style.display = "none", 2500); }
+
+/* ---------- 시험 세션 ----------
+   sess = {id,name,sid,grade,set,deadline,phase:'exam'|'result'|'retry',
+           queue:[...],pos,first:{q:점수},final:{q:점수},retryQ:[...],usedAnswer:[...],checks:{q:[...]}} */
+let sess = store.get("exam:sess", null);
+const saveSess = () => store.set("exam:sess", sess);
+const G = () => CONFIG.grades[sess.grade];
+const workKey = q => `exam:work|${sess.id}|${q}`;
+const entKey = (kind, q) => `${G().data}/s${sess.set + 1}/${kind}/${nn(q)}.ent`;
+const curQ = () => (sess.phase === "retry" ? sess.retryQ : sess.queue)[sess.pos];
+
+/* ---------- 시작 화면 ---------- */
+function initStart(){
+  const sg = $("selGrade"); sg.innerHTML = "";
+  Object.keys(CONFIG.grades).forEach(g => {
+    const o = document.createElement("option"); o.value = g;
+    o.textContent = "Entry " + g + (CONFIG.grades[g].data ? "" : " (준비 중)");
+    o.disabled = !CONFIG.grades[g].data; sg.appendChild(o);
+  });
+  sg.value = "3급";
+  const fillSets = () => {
+    const ss = $("selSet"); ss.innerHTML = "";
+    CONFIG.grades[sg.value].sets.forEach((s, i) => { const o = document.createElement("option"); o.value = i; o.textContent = s; ss.appendChild(o); });
+  };
+  sg.onchange = fillSets; fillSets();
+  $("inName").value = store.get("exam:lastName", ""); $("inId").value = store.get("exam:lastId", "");
+  const rb = $("resumeBox");
+  if(sess && sess.phase !== "done"){
+    const label = sess.phase === "exam" ? "시험 보던 중" : sess.phase === "retry" ? "틀린 문제 다시 푸는 중" : "결과 확인 중";
+    rb.hidden = false;
+    rb.innerHTML = `<b>${sess.name}</b> 학생이 ${sess.grade} ${G().sets[sess.set]}을(를) ${label}이에요. `;
+    const b = document.createElement("button"); b.className = "btn"; b.textContent = "이어서 하기";
+    b.onclick = resumeSess; rb.appendChild(b);
+  } else rb.hidden = true;
+  show("start");
+}
+$("btnBegin").onclick = () => {
+  const name = $("inName").value.trim();
+  if(!name){ alert("이름을 입력해 주세요."); $("inName").focus(); return; }
+  if(sess && sess.phase !== "done" && !confirm("보던 시험이 있어요. 새로 시작하면 이어서 하기는 사라집니다. 새로 시작할까요?")) return;
+  const grade = $("selGrade").value, set = +$("selSet").value, sid = $("inId").value.trim();
+  store.set("exam:lastName", name); store.set("exam:lastId", sid);
+  const P = CONFIG.grades[grade].problems;
+  sess = { id: Date.now().toString(36), name, sid, grade, set, startedAt: Date.now(),
+    deadline: null, started: false, phase: "exam",
+    queue: Array.from({length: P}, (_, i) => i + 1), pos: 0, first: {}, final: {}, retryQ: [], usedAnswer: [], checks: {} };
+  saveSess(); enterExam(true);
+};
+function resumeSess(){
+  if(sess.phase === "result") showResult(); else enterExam(false);
+}
+$("btnCsv").onclick = () => {
+  const rec = store.get("exam:records", []);
+  if(!rec.length){ alert("저장된 기록이 아직 없어요."); return; }
+  const P = 10, head = ["일시","이름","아이디","급수","세트","1차점수","최종점수","정답본문제"].concat(Array.from({length: P}, (_, i) => `${i + 1}번(1차)`)).concat(Array.from({length: P}, (_, i) => `${i + 1}번(최종)`));
+  const esc = v => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const lines = [head.map(esc).join(",")].concat(rec.map(r => {
+    const d = new Date(r.at), ds = `${d.getFullYear()}-${nn(d.getMonth() + 1)}-${nn(d.getDate())} ${nn(d.getHours())}:${nn(d.getMinutes())}`;
+    const row = [ds, r.name, r.sid, r.grade, CONFIG.grades[r.grade].sets[r.set], r.firstScore, r.finalScore, (r.usedAnswer || []).join(" ")];
+    for(let q = 1; q <= P; q++) row.push(r.first[q] ?? "");
+    for(let q = 1; q <= P; q++) row.push(r.final[q] ?? "");
+    return row.map(esc).join(",");
+  }));
+  download(new TextEncoder().encode("﻿" + lines.join("\r\n")), "cos_entry_기록.csv", "text/csv");
+};
+
+/* ---------- 엔트리 편집기 ---------- */
+const frame = $("entryFrame"), right = $("right");
+let entReady = false, loadedQ = null, openToken = 0, seq = 0, reviewMode = false;
+const pending = {};
+window.addEventListener("message", e => {
+  if(e.source !== frame.contentWindow) return;
+  const m = e.data || {};
+  if(m.type === "entry-ready"){ entReady = true; if(sess && $("exam").classList.contains("on")) openProblem(); return; }
+  if(m.id && pending[m.id]){ pending[m.id](m); delete pending[m.id]; }
+});
+function call(type, payload = {}, transfer = [], timeout = 20000){
+  return new Promise((resolve, reject) => {
+    const id = ++seq;
+    const t = setTimeout(() => { delete pending[id]; reject(new Error("엔트리 응답이 없어요")); }, timeout);
+    pending[id] = m => { clearTimeout(t); m.type === "error" ? reject(new Error(m.message)) : resolve(m); };
+    frame.contentWindow.postMessage(Object.assign({type, id}, payload), "*", transfer);
+  });
+}
+let eScale = store.get("ezoom", null);
+const autoScale = () => Math.round(Math.max(0.55, Math.min(1, right.clientWidth / 1150)) / 0.05) * 0.05;
+const stepE = d => { eScale = Math.min(1.2, Math.max(0.5, Math.round(((eScale || autoScale()) + d) * 100) / 100)); store.set("ezoom", eScale); resizeEntry(); };
+function resizeEntry(){
+  const w = right.clientWidth, h = right.clientHeight;
+  if(!w || !h) return;
+  const z = eScale || autoScale();
+  $("eVal").textContent = Math.round(z * 100) + "%";
+  frame.style.width = (w / z) + "px"; frame.style.height = (h / z) + "px"; frame.style.transform = `scale(${z})`;
+}
+$("eMinus").onclick = () => stepE(-0.05); $("ePlus").onclick = () => stepE(0.05);
+$("pMinus").onclick = () => stepP(-0.1); $("pPlus").onclick = () => stepP(0.1);
+new ResizeObserver(resizeEntry).observe(right);
+window.addEventListener("resize", resizeEntry);
+
+const entCache = {};
+function loadScript(src){
+  return new Promise((res, rej) => { const s = document.createElement("script"); s.src = src; s.onload = res; s.onerror = () => rej(new Error("파일을 찾을 수 없어요: " + src)); document.head.appendChild(s); });
+}
+async function getEnt(kind, q){
+  const k = entKey(kind, q);
+  if(!entCache[k]){
+    if(!(window.__ENT && window.__ENT[k])) await loadScript(k.replace(/\.ent$/, ".js"));
+    const b64 = window.__ENT && window.__ENT[k];
+    if(!b64) throw new Error("자료 형식 오류");
+    const bin = atob(b64), u8 = new Uint8Array(bin.length);
+    for(let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+    entCache[k] = u8.buffer; delete window.__ENT[k];
+  }
+  return entCache[k];
+}
+function download(data, name, type = "application/octet-stream"){
+  const url = URL.createObjectURL(new Blob([data], {type}));
+  const a = document.createElement("a"); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1500);
+}
+
+async function openProblem(){
+  if(!entReady || !sess) return;
+  const q = curQ(), token = ++openToken;
+  loadedQ = null; reviewMode = false; $("bAnswer").textContent = "정답 보기";
+  try{
+    const buf = await getEnt("start", q);
+    if(token !== openToken) return;
+    const copy = buf.slice(0);
+    await call("load", {buf: copy, saved: store.get(workKey(q), null)}, [copy]);
+    if(token !== openToken) return;
+    loadedQ = q;
+  }catch(err){ toast("불러오기 실패: " + err.message); }
+}
+async function saveCurrent(){
+  if(!entReady || loadedQ == null || reviewMode) return;
+  try{ const r = await call("export-json", {}, [], 5000); store.set(workKey(loadedQ), r.json); }catch(e){}
+}
+setInterval(() => { if($("exam").classList.contains("on")) saveCurrent(); }, 10000);
+
+/* ---------- 문제지(쪽별 그림) ---------- */
+const leftBox = $("left");
+let pScale = store.get("pzoom", 1);
+function applyPScale(){ leftBox.querySelectorAll("img").forEach(i => i.style.width = Math.round(pScale * 100) + "%"); $("pVal").textContent = Math.round(pScale * 100) + "%"; }
+const stepP = d => { pScale = Math.min(3, Math.max(0.5, Math.round((pScale + d) * 100) / 100)); store.set("pzoom", pScale); applyPScale(); };
+let pdfToken = 0;
+async function renderPdf(q){
+  const token = ++pdfToken;
+  leftBox.querySelectorAll("img,.note").forEach(n => n.remove()); leftBox.scrollTop = 0;
+  const base = `${G().data}/s${sess.set + 1}/problem/${nn(q)}`;
+  try{
+    if(!(window.__PAGES && window.__PAGES[base])) await loadScript(G().data + "/pages.js");
+    if(token !== pdfToken) return;
+    const files = (window.__PAGES && window.__PAGES[base]) || [];
+    if(!files.length) throw 0;
+    const dir = base.slice(0, base.lastIndexOf("/") + 1);
+    files.forEach((f, i) => { const img = document.createElement("img"); img.src = dir + f; img.alt = `${q}번 문제 ${i + 1}쪽`; leftBox.append(img); });
+    applyPScale();
+  }catch(e){ leftBox.insertAdjacentHTML("beforeend", '<div class="note">문제 그림을 불러오지 못했어요.</div>'); }
+}
+
+/* ---------- 시험 진행 ---------- */
+let timerId = null;
+const isStarted = () => sess.phase !== "exam" || sess.started || !!sess.deadline;
+function tick(){
+  if(sess.phase !== "exam"){ return; }
+  if(!isStarted()){ const t = G().minutes * 60; $("time").textContent = `${nn(Math.floor(t / 60))}:${nn(t % 60)}`; return; }
+  const left = Math.max(0, Math.ceil((sess.deadline - Date.now()) / 1000));
+  const m = nn(Math.floor(left / 60)), s = nn(left % 60);
+  $("time").textContent = `${m}:${s}`; $("time").classList.toggle("low", left <= 300);
+  if(left <= 0){ clearInterval(timerId); timerId = null; submitExam("시간이 끝나 자동으로 제출했어요."); }
+}
+function renderBar(){
+  const retry = sess.phase === "retry";
+  $("barGrade").textContent = `Entry ${sess.grade} / ${G().sets[sess.set]}`;
+  $("barName").textContent = sess.name + (sess.sid ? `(${sess.sid})` : "");
+  const q = curQ(), total = G().problems;
+  $("barProg").textContent = retry ? `틀린 문제 ${sess.retryQ.length}개 중 ${sess.pos + 1}번째 · ${q}번 풀이중` : `총 ${total} 문제 중 ${q}번 풀이중`;
+  const skipped = retry ? 0 : sess.queue.slice(sess.pos + 1).filter(x => sess.queue.indexOf(x) <= sess.pos).length;
+  $("barSkip").textContent = skipped ? ` (${skipped}문제 건너뜀)` : "";
+  $("bSkip").hidden = retry; $("bGrade").hidden = !retry; $("bAnswer").hidden = !retry;
+  const last = sess.pos >= (retry ? sess.retryQ : sess.queue).length - 1;
+  $("bNext").textContent = retry ? (last ? "결과 보기" : "다음 틀린문제") : (last ? "제출" : "다음문제");
+  $("time").parentElement.style.display = retry ? "none" : "";
+}
+async function enterExam(fresh){
+  show("exam");
+  if(!frame.getAttribute("src")) frame.src = "entry_frame.html";
+  renderBar(); renderPdf(curQ());
+  clearInterval(timerId); timerId = null;
+  if(sess.phase === "exam"){ tick(); timerId = setInterval(tick, 1000); }
+  const gated = !isStarted();
+  $("gate").classList.toggle("on", gated);
+  $("gateTitle").textContent = `Entry ${sess.grade} · ${G().sets[sess.set]}`;
+  $("gateInfo").textContent = `${sess.name}님, 준비되면 시작을 누르세요. 제한시간 ${G().minutes}분 · 총 ${G().problems}문제 · 시작하면 시간이 흘러가요.`;
+  ["bRedo","bSkip","bNext"].forEach(id => $(id).disabled = gated);
+  if(entReady) openProblem();
+}
+async function goTo(pos){
+  await saveCurrent();
+  sess.pos = pos; saveSess();
+  renderBar(); renderPdf(curQ()); openProblem();
+}
+
+$("gateGo").onclick = () => {
+  sess.started = true; sess.deadline = Date.now() + G().minutes * 60000; saveSess();
+  $("gate").classList.remove("on"); ["bRedo","bSkip","bNext"].forEach(id => $(id).disabled = false);
+  tick();
+};
+$("bNext").onclick = async () => {
+  if(sess.phase === "retry"){
+    if(sess.pos >= sess.retryQ.length - 1){ await saveCurrent(); finishRetry(); return; }
+    return goTo(sess.pos + 1);
+  }
+  if(sess.pos >= sess.queue.length - 1){
+    if(!confirm("모든 문제를 풀었어요. 답안을 제출할까요?\n제출하면 시험은 끝나고 채점해요.")) return;
+    await saveCurrent(); submitExam(); return;
+  }
+  goTo(sess.pos + 1);
+};
+$("bSkip").onclick = async () => {
+  const q = curQ();
+  if(!confirm(`${q}번 문제를 건너뛸까요?\n건너뛴 문제는 풀이가 저장되지 않고, 마지막에 다시 나와요.`)) return;
+  store.del(workKey(q));
+  loadedQ = null;                      // 건너뛴 문제의 현재 화면은 저장하지 않음
+  sess.queue.push(q); sess.pos++; saveSess();
+  renderBar(); renderPdf(curQ()); openProblem();
+};
+$("bRedo").onclick = () => {
+  if(!confirm("이 문제를 처음 상태부터 다시 풀까요? 지금까지 푼 내용은 사라져요.")) return;
+  store.del(workKey(curQ())); loadedQ = null; openProblem();
+};
+
+/* ---------- 채점 · 제출 ---------- */
+async function gradeQ(q){
+  const saved = store.get(workKey(q), null);
+  if(!saved) return {q, score: 0, correct: 0, total: 1, checks: [{label: "저장한 답안이 없어요 (건너뛰었거나 풀지 않은 문제)", ok: false}]};
+  const [sb, ab] = await Promise.all([getEnt("start", q), getEnt("answer", q)]);
+  return Object.assign({q}, CosGrader.grade(CosGrader.readProject(sb), CosGrader.readProject(ab), JSON.parse(saved)));
+}
+const avg = o => { const v = Object.values(o); return v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : 0; };
+
+async function submitExam(note){
+  clearInterval(timerId); timerId = null;
+  await saveCurrent();
+  const P = G().problems;
+  sess.first = {}; sess.checks = {};
+  for(let q = 1; q <= P; q++){
+    try{ const r = await gradeQ(q); sess.first[q] = r.score; sess.checks[q] = r.checks; }
+    catch(e){ sess.first[q] = 0; sess.checks[q] = [{label: "채점 오류: " + e.message, ok: false}]; }
+  }
+  sess.final = Object.assign({}, sess.first);
+  sess.retryQ = Object.keys(sess.first).map(Number).filter(q => sess.first[q] < 100);
+  sess.phase = "result"; sess.note = note || ""; sess.submittedAt = Date.now();
+  saveSess(); writeRecord(); showResult();
+}
+function writeRecord(){
+  const rec = store.get("exam:records", []);
+  const row = {id: sess.id, at: sess.submittedAt || Date.now(), name: sess.name, sid: sess.sid, grade: sess.grade, set: sess.set,
+    first: sess.first, final: sess.final, firstScore: avg(sess.first), finalScore: avg(sess.final), usedAnswer: sess.usedAnswer};
+  const i = rec.findIndex(r => r.id === sess.id);
+  if(i >= 0) rec[i] = row; else rec.push(row);
+  store.set("exam:records", rec);
+  syncPush(Object.assign({}, row, {setName: G().sets[row.set]}));
+}
+
+/* ---------- 원장님 진도대시보드로 기록 보내기 (Apps Script 주소를 아래에 붙여넣기) ---------- */
+const COS_SYNC_URL = "https://script.google.com/macros/s/AKfycbwHt7y0wBRW9pTMSaAYc1cesUzcWUku91x5vbw9thCPTUuN4D4XXpd56oW_e8ZSRd3l/exec";   // 예: "https://script.google.com/macros/s/XXXX/exec"  (비워두면 전송 안 함)
+let syncing = false;
+function syncPush(row){
+  if(!COS_SYNC_URL) return;
+  const q = store.get("exam:syncq", {}); q[row.id] = row; store.set("exam:syncq", q);
+  syncFlush();
+}
+async function syncFlush(){
+  if(!COS_SYNC_URL || syncing) return;
+  syncing = true;
+  try{
+    const q = store.get("exam:syncq", {});
+    for(const id of Object.keys(q)){
+      const sent = JSON.stringify(q[id]);
+      try{
+        await fetch(COS_SYNC_URL, {method: "POST", mode: "no-cors", headers: {"Content-Type": "text/plain;charset=utf-8"}, body: sent});
+      }catch(e){ break; }   // 인터넷이 안 되면 남겨두고 나중에 다시 보냄
+      const cur = store.get("exam:syncq", {});
+      if(JSON.stringify(cur[id]) === sent){ delete cur[id]; store.set("exam:syncq", cur); }
+    }
+  }finally{ syncing = false; }
+}
+window.addEventListener("online", syncFlush);
+syncFlush();
+
+/* ---------- 결과 화면 ---------- */
+function showResult(){
+  show("result");
+  const wrong = Object.keys(sess.final).filter(q => sess.final[q] < 100);
+  $("rTitle").textContent = `${sess.name}${sess.sid ? `(${sess.sid})` : ""} · ${sess.grade} ${G().sets[sess.set]}`;
+  $("rSub").textContent = sess.note || (new Date(sess.submittedAt).toLocaleString("ko-KR") + " 제출 · 연습용 채점(공식 점수 아님)");
+  $("rScore").textContent = avg(sess.final);
+  const f = avg(sess.first), a = avg(sess.final);
+  $("rNote").innerHTML = `첫 제출 <b>${f}점</b>` + (a !== f ? ` → 다시 풀어서 <b>${a}점</b>` : "") + `<br>${Object.keys(sess.final).length - wrong.length}문제 정답 · ${wrong.length}문제 남음`;
+  const grid = $("rGrid"); grid.replaceChildren();
+  Object.keys(sess.final).map(Number).forEach(q => {
+    const ok = sess.final[q] >= 100, fixed = ok && sess.first[q] < 100;
+    const c = document.createElement("div"); c.className = "cell " + (fixed ? "fixed" : ok ? "ok" : "bad"); c.style.cursor = "pointer";
+    c.innerHTML = `<b>${q}번</b><span>${ok ? "○" : "✕"}</span><small>${sess.final[q]}점${fixed ? " (재풀이)" : ""}${sess.usedAnswer.includes(q) ? " · 정답확인" : ""}</small>`;
+    c.onclick = () => openDlg(`${q}번 문제 · 첫 제출 ${sess.first[q]}점`, sess.checks[q] || []);
+    grid.appendChild(c);
+  });
+  $("rRetry").hidden = wrong.length === 0;
+  $("rRetry").textContent = `틀린 문제 풀기 (${wrong.length}개)`;
+  sess.retryQ = wrong.map(Number); saveSess();
+}
+function openDlg(title, checks, showNext){
+  $("dlgTitle").textContent = title;
+  const ul = $("dlgList"); ul.replaceChildren();
+  checks.forEach(c => { const li = document.createElement("li"); li.className = c.ok ? "ok-t" : "bad-t"; li.textContent = (c.ok ? "✓ " : "✗ ") + c.label; ul.appendChild(li); });
+  $("dlgNext").hidden = !showNext;
+  $("dlg").showModal();
+}
+$("dlgClose").onclick = () => $("dlg").close();
+$("dlgNext").onclick = () => { $("dlg").close(); $("bNext").click(); };
+$("rHome").onclick = () => { sess.phase = "done"; saveSess(); initStart(); };
+$("rRetry").onclick = async () => {
+  if(!sess.retryQ.length) return;
+  sess.phase = "retry"; sess.pos = 0; saveSess();
+  // 건너뛰어서 풀이가 없던 문제는 처음 상태에서, 푼 문제는 푼 내용에서 다시 시작합니다.
+  enterExam(false);
+};
+
+/* ---------- 틀린 문제 풀이 단계 ---------- */
+$("bGrade").onclick = async () => {
+  const q = curQ();
+  if(reviewMode){ toast("정답 보기 중이에요. '내 풀이로'를 눌러 돌아와 주세요."); return; }
+  await saveCurrent();
+  try{
+    const r = await gradeQ(q);
+    const ok = r.score >= 100;
+    if(ok){ sess.final[q] = 100; sess.checks[q] = r.checks; saveSess(); writeRecord(); }
+    const last = sess.pos >= sess.retryQ.length - 1;
+    openDlg(ok ? `${q}번 정답이에요! 🎉` : `${q}번 ${r.score}점 · 조금 더 고쳐 볼까요?`, r.checks, ok && !last);
+  }catch(e){ toast("채점 실패: " + e.message); }
+};
+$("bAnswer").onclick = async () => {
+  const q = curQ();
+  if(!reviewMode){
+    if(!confirm("정답을 보면 이 문제는 '정답 확인' 으로 기록돼요. 볼까요?")) return;
+    await saveCurrent();
+    if(!sess.usedAnswer.includes(q)){ sess.usedAnswer.push(q); saveSess(); writeRecord(); }
+    reviewMode = true; loadedQ = null; $("bAnswer").textContent = "내 풀이로";
+    try{
+      const buf = (await getEnt("answer", q)).slice(0);
+      await call("load", {buf, saved: null}, [buf]);
+    }catch(e){ toast("정답을 열지 못했어요: " + e.message); }
+  } else openProblem();
+};
+function finishRetry(){ writeRecord(); sess.phase = "result"; saveSess(); showResult(); }
+
+/* ---------- 패널 너비 조절 ---------- */
+(function(){
+  const split = $("split"), left = $("left"); let drag = false;
+  split.onpointerdown = e => { drag = true; split.setPointerCapture(e.pointerId); split.classList.add("drag"); frame.style.pointerEvents = "none"; };
+  split.onpointermove = e => { if(drag) left.style.width = Math.min(60, Math.max(18, e.clientX / innerWidth * 100)) + "%"; };
+  const end = () => { drag = false; split.classList.remove("drag"); frame.style.pointerEvents = ""; };
+  split.onpointerup = end; split.onpointercancel = end;
+})();
+
+window.addEventListener("beforeunload", () => { try{ if($("exam").classList.contains("on")) saveCurrent(); }catch(e){} });
+initStart();
+</script>
+</body>
+</html>
