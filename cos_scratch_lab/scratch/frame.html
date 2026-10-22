@@ -3,6 +3,6 @@ var st=document.createElement("style");st.id="slimBars";
 st.textContent=".blocklyScrollbarHandle{fill:"+c+"55 !important;fill-opacity:1 !important}.blocklyScrollbarHandle:hover{fill:"+c+"aa !important}.blocklyScrollbarVertical .blocklyScrollbarHandle{width:6px !important;transform:translateX(4px)}.blocklyScrollbarHorizontal .blocklyScrollbarHandle{height:6px !important;transform:translateY(4px)}*{scrollbar-width:thin;scrollbar-color:"+c+"55 transparent}*::-webkit-scrollbar{width:6px;height:6px}*::-webkit-scrollbar-thumb{background:"+c+"55;border-radius:3px}*::-webkit-scrollbar-track{background:transparent}";
 document.documentElement.appendChild(st);
 var done=false,t0=Date.now();
-var iv=setInterval(function(){var g=document.querySelector('[class*="stage-size-toggle-group"]');var b=g&&g.querySelectorAll("button");
-if(b&&b.length>1){if(!/highlighted/.test(b[0].className))b[0].click();done=true;}
+var iv=setInterval(function(){var bt=document.querySelector('button[aria-label^="작은 무대"],button[aria-label^="Switch to small stage"]');
+if(bt){if(!/selected|highlighted|active/.test(bt.className)&&bt.getAttribute("aria-pressed")!=="true")bt.click();done=true;}
 if(done||Date.now()-t0>40000)clearInterval(iv);},300);})();</script></head><body></body></html>
