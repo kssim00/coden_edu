@@ -201,6 +201,9 @@
     });
     Entry.loadProject();
     document.getElementById('load').remove();
+    /* 무대를 가장 좁게(324px) 열어 블록 영역을 넓혀요 */
+    var narrow=function(){ try{ Entry.resizeElement({canvasWidth: Entry.CANVAS_DEFAULT_WIDTH || 324}); }catch(e){} };
+    narrow(); setTimeout(narrow, 400); setTimeout(narrow, 1500);
     parent.postMessage({type:'entry-ready'}, '*');
   }catch(e){
     document.getElementById('load').innerHTML = '엔트리를 불러오지 못했어요.<br><small>' + (e.message || e) + '<br>인터넷 연결을 확인하고 새로고침해 주세요.</small>';
