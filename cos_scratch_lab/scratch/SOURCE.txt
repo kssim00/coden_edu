@@ -1,0 +1,4 @@
+이 폴더의 스크래치 편집기는 Scratch Foundation의 scratch-editor (AGPL-3.0)를 빌드한 것입니다.
+소스: https://github.com/scratchfoundation/scratch-editor  (커밋 a557e1f394a107e0e6d47289f29ae48ab76efd0f)
+변경 사항: 같은 폴더의 cos-frame.patch (메뉴바 숨김 + 부모 페이지와 통신하는 cos-frame 추가)
+Scratch는 MIT Scratch Team의 상표이며 이 연습실은 비공식입니다.

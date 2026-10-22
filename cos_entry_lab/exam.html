@@ -96,7 +96,7 @@ dialog ul{padding-left:18px;margin:8px 0;max-height:46vh;overflow:auto}
     <div class="field"><label for="selGrade">급수</label><select id="selGrade"></select></div>
     <div class="field"><label for="selSet">세트</label><select id="selSet"></select></div>
     <div class="field"><label for="inName">이름</label><input id="inName" placeholder="홍길동" autocomplete="off"></div>
-    <div class="field"><label for="inId">아이디</label><input id="inId" placeholder="hong (선택)" autocomplete="off"></div>
+    <div class="field" style="display:none"><label for="inId">아이디</label><input id="inId" placeholder="hong (선택)" autocomplete="off"></div>
     <div id="resumeBox" class="resume" hidden></div>
     <button class="btn big" id="btnBegin">시험 시작</button>
     <div class="links"><a href="index.html">← 연습 모드(문제 골라 풀기)</a><button class="linkbtn" id="btnCsv">기록 CSV 내려받기</button></div>
@@ -191,7 +191,7 @@ function initStart(){
     CONFIG.grades[sg.value].sets.forEach((s, i) => { const o = document.createElement("option"); o.value = i; o.textContent = s; ss.appendChild(o); });
   };
   sg.onchange = fillSets; fillSets();
-  $("inName").value = store.get("exam:lastName", ""); $("inId").value = store.get("exam:lastId", "");
+  $("inName").value = store.get("exam:lastName", ""); $("inId").value = "";
   const rb = $("resumeBox");
   if(sess && sess.phase !== "done"){
     const label = sess.phase === "exam" ? "시험 보던 중" : sess.phase === "retry" ? "틀린 문제 다시 푸는 중" : "결과 확인 중";

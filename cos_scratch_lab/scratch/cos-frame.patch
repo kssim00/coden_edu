@@ -1,0 +1,130 @@
+diff --git a/packages/scratch-gui/src/playground/cos-frame.jsx b/packages/scratch-gui/src/playground/cos-frame.jsx
+new file mode 100644
+index 0000000..8a02c2e
+--- /dev/null
++++ b/packages/scratch-gui/src/playground/cos-frame.jsx
+@@ -0,0 +1,66 @@
++import React from 'react';
++import ReactDomClient from 'react-dom/client';
++import {compose} from 'redux';
++
++import AppStateHOC from '../lib/app-state-hoc.jsx';
++import GUI from '../containers/gui.jsx';
++import HashParserHOC from '../lib/hash-parser-hoc.jsx';
++
++import styles from './index.css';
++
++/*
++ * COS 연습실용 임베드 화면.
++ * 부모 페이지와 postMessage로 통신합니다.
++ *   부모 → 여기:  {type:'load', id, buf}      sb3(ArrayBuffer)를 편집기에 불러오기
++ *                {type:'export', id}         현재 작업을 sb3로 내보내기
++ *   여기 → 부모:  {type:'scratch-ready'}, {id, type:'loaded'|'sb3'|'error', ...}
++ */
++const appTarget = document.createElement('div');
++appTarget.className = styles.app;
++document.body.appendChild(appTarget);
++GUI.setAppElement(appTarget);
++
++let vm = null;
++let announced = false;
++const announceReady = () => {
++    if (announced) return;
++    announced = true;
++    parent.postMessage({type: 'scratch-ready'}, '*');
++};
++
++const handleVmInit = v => {
++    vm = v;
++    // 편집기가 기본 프로젝트를 다 불러온 뒤에야 우리 프로젝트를 올릴 수 있어요.
++    vm.runtime.once('PROJECT_LOADED', announceReady);
++    setTimeout(announceReady, 20000);
++};
++
++const WrappedGui = compose(AppStateHOC, HashParserHOC)(GUI);
++ReactDomClient.createRoot(appTarget).render(
++    <WrappedGui
++        menuBarHidden
++        canSave={false}
++        onVmInit={handleVmInit}
++    />
++);
++
++window.addEventListener('message', async ev => {
++    if (ev.source !== parent) return;
++    const m = ev.data || {};
++    const reply = (d, transfer) => parent.postMessage(Object.assign({id: m.id}, d), '*', transfer || []);
++    try {
++        if (!vm) throw new Error('편집기가 아직 준비되지 않았어요.');
++        if (m.type === 'load') {
++            vm.stopAll();
++            await vm.loadProject(m.buf);
++            reply({type: 'loaded'});
++        } else if (m.type === 'export') {
++            const blob = await vm.saveProjectSb3();
++            const buf = await blob.arrayBuffer();
++            reply({type: 'sb3', buf}, [buf]);
++        }
++    } catch (e) {
++        console.error(e);
++        reply({type: 'error', message: (e && e.message) || String(e)});
++    }
++});
+diff --git a/packages/scratch-gui/webpack.config.js b/packages/scratch-gui/webpack.config.js
+index b97bc1c..b512beb 100644
+--- a/packages/scratch-gui/webpack.config.js
++++ b/packages/scratch-gui/webpack.config.js
+@@ -165,11 +165,7 @@ const buildConfig = baseConfig.clone()
+     .enableDevServer(process.env.PORT || 8601)
+     .merge({
+         entry: {
+-            gui: './src/playground/index.jsx',
+-            guistandalone: './src/playground/standalone.jsx',
+-            blocksonly: './src/playground/blocks-only.jsx',
+-            compatibilitytesting: './src/playground/compatibility-testing.jsx',
+-            player: './src/playground/player.jsx'
++            cosframe: './src/playground/cos-frame.jsx'
+         },
+         output: {
+             path: path.resolve(__dirname, 'build'),
+@@ -183,37 +179,10 @@ const buildConfig = baseConfig.clone()
+     })
+     .addPlugin(new HtmlWebpackPlugin({
+         ...commonHtmlWebpackPluginOptions,
+-        chunks: ['gui'],
++        chunks: ['cosframe'],
++        filename: 'frame.html',
+         template: 'src/playground/index.ejs',
+-        title: 'Scratch 3.0 GUI'
+-    }))
+-    .addPlugin(new HtmlWebpackPlugin({
+-        ...commonHtmlWebpackPluginOptions,
+-        chunks: ['guistandalone'],
+-        filename: 'standalone.html',
+-        template: 'src/playground/index.ejs',
+-        title: 'Scratch 3.0 GUI: Standalone Mode'
+-    }))
+-    .addPlugin(new HtmlWebpackPlugin({
+-        ...commonHtmlWebpackPluginOptions,
+-        chunks: ['blocksonly'],
+-        filename: 'blocks-only.html',
+-        template: 'src/playground/index.ejs',
+-        title: 'Scratch 3.0 GUI: Blocks Only Example'
+-    }))
+-    .addPlugin(new HtmlWebpackPlugin({
+-        ...commonHtmlWebpackPluginOptions,
+-        chunks: ['compatibilitytesting'],
+-        filename: 'compatibility-testing.html',
+-        template: 'src/playground/index.ejs',
+-        title: 'Scratch 3.0 GUI: Compatibility Testing'
+-    }))
+-    .addPlugin(new HtmlWebpackPlugin({
+-        ...commonHtmlWebpackPluginOptions,
+-        chunks: ['player'],
+-        filename: 'player.html',
+-        template: 'src/playground/index.ejs',
+-        title: 'Scratch 3.0 GUI: Player Example'
++        title: 'COS Scratch frame'
+     }))
+     .addPlugin(new CopyWebpackPlugin({
+         patterns: [
