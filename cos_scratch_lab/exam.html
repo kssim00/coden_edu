@@ -38,7 +38,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 #gate h2{margin:0;font-size:26px}
 #gate p{margin:0;color:#7a4a12}
 #gate .btn{font-size:20px;padding:14px 40px}
-#left{width:30%;min-width:240px;background:var(--or-l);border-right:1px solid var(--line);overflow:auto}
+#left{width:25%;min-width:240px;background:var(--or-l);border-right:1px solid var(--line);overflow:auto}
 #left{position:relative}
 #left img{display:block;height:auto;margin:0 auto}
 .zoomctl{position:absolute;right:12px;bottom:12px;background:#fff6;border:1px solid #0001;opacity:.5;transition:opacity .15s;border-radius:20px;padding:3px 6px;display:flex;align-items:center;gap:2px;font-weight:700;font-size:13px;z-index:5;box-shadow:none}
@@ -48,6 +48,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .zoomctl span{min-width:42px;text-align:center}
 #pzoom{right:auto;left:12px;position:fixed;bottom:70px}
 #left{overflow:auto}
+#left{scrollbar-width:thin;scrollbar-color:#e8913a55 transparent}#left::-webkit-scrollbar{width:6px}#left::-webkit-scrollbar-track{background:transparent}#left::-webkit-scrollbar-thumb{background:#e8913a55;border-radius:3px}#left::-webkit-scrollbar-thumb:hover{background:#e8913aaa}
 #left .note{padding:20px;color:#8a5a22}
 #split{width:7px;cursor:col-resize;background:#ecd9c0;flex:none}
 #split:hover,#split.drag{background:var(--or)}
@@ -245,10 +246,12 @@ $("btnCsv").onclick = () => {
 const frame = $("entryFrame"), right = $("right");
 let entReady = false, loadedQ = null, openToken = 0, seq = 0, reviewMode = false;
 const pending = {};
+function slimBars(){ try{ const d = frame.contentDocument; if(!d || d.getElementById("slimBars")) return; const s = d.createElement("style"); s.id = "slimBars"; s.textContent = ".blocklyScrollbarHandle{fill:#e8913a55 !important;fill-opacity:1 !important}.blocklyScrollbarHandle:hover{fill:#e8913aaa !important}.blocklyScrollbarVertical .blocklyScrollbarHandle{width:6px !important;transform:translateX(4px)}.blocklyScrollbarHorizontal .blocklyScrollbarHandle{height:6px !important;transform:translateY(4px)}*{scrollbar-width:thin;scrollbar-color:#e8913a55 transparent}*::-webkit-scrollbar{width:6px;height:6px}*::-webkit-scrollbar-thumb{background:#e8913a55;border-radius:3px}*::-webkit-scrollbar-track{background:transparent}"; d.head.appendChild(s); }catch(e){} }
+function smallStage(){ try{ const d = frame.contentDocument; const g = d && d.querySelector('[class*="stage-size-toggle-group"]'); const b = g && g.querySelectorAll("button"); if(b && b.length > 1 && !/highlighted/.test(b[0].className)) b[0].click(); }catch(e){} }
 window.addEventListener("message", e => {
   if(e.source !== frame.contentWindow) return;
   const m = e.data || {};
-  if(m.type === "scratch-ready"){ entReady = true; if(sess && $("exam").classList.contains("on")) openProblem(); return; }
+  if(m.type === "scratch-ready"){ entReady = true; smallStage(); slimBars(); if(sess && $("exam").classList.contains("on")) openProblem(); return; }
   if(m.id && pending[m.id]){ pending[m.id](m); delete pending[m.id]; }
 });
 function call(type, payload = {}, transfer = [], timeout = 20000){
@@ -364,7 +367,7 @@ function renderBar(){
 }
 async function enterExam(fresh){
   show("exam");
-  if(!frame.getAttribute("src")) frame.src = "scratch/frame.html?locale=ko";
+  if(!frame.getAttribute("src")) frame.src = "scratch/frame.html?locale=ko&theme=or";
   renderBar(); renderPdf(curQ());
   clearInterval(timerId); timerId = null;
   if(sess.phase === "exam"){ tick(); timerId = setInterval(tick, 1000); }

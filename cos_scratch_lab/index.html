@@ -12,9 +12,10 @@ body{display:flex;flex-direction:column}
 button{font:inherit;cursor:pointer}
 button:disabled{opacity:.5;cursor:not-allowed}
 main{flex:1;min-height:0;display:flex}
-#left{width:30%;min-width:240px;background:var(--tl-l);border-right:1px solid var(--line);position:relative;display:flex;flex-direction:column}
+#left{width:25%;min-width:240px;background:var(--tl-l);border-right:1px solid var(--line);position:relative;display:flex;flex-direction:column}
 #pdf{flex:1;overflow:auto}
 #pdf img{display:block;height:auto;margin:0 auto}
+#pdf{scrollbar-width:thin;scrollbar-color:#2bb3a355 transparent}#pdf::-webkit-scrollbar{width:6px}#pdf::-webkit-scrollbar-track{background:transparent}#pdf::-webkit-scrollbar-thumb{background:#2bb3a355;border-radius:3px}#pdf::-webkit-scrollbar-thumb:hover{background:#2bb3a3aa}
 #pdf .note{padding:20px;color:#0b6b61}
 #split{width:7px;cursor:col-resize;background:#cfe9e5;flex:none}
 #split:hover,#split.drag{background:var(--tl)}
@@ -262,10 +263,12 @@ window.addEventListener("resize", resizeEntry);
 /* ---------- 스크래치 편집기 연결 ---------- */
 let entReady = false, loadedKey = null, openToken = 0, seq = 0, reviewMode = false;
 const pending = {};
+function slimBars(){ try{ const d = frame.contentDocument; if(!d || d.getElementById("slimBars")) return; const s = d.createElement("style"); s.id = "slimBars"; s.textContent = ".blocklyScrollbarHandle{fill:#2bb3a355 !important;fill-opacity:1 !important}.blocklyScrollbarHandle:hover{fill:#2bb3a3aa !important}.blocklyScrollbarVertical .blocklyScrollbarHandle{width:6px !important;transform:translateX(4px)}.blocklyScrollbarHorizontal .blocklyScrollbarHandle{height:6px !important;transform:translateY(4px)}*{scrollbar-width:thin;scrollbar-color:#2bb3a355 transparent}*::-webkit-scrollbar{width:6px;height:6px}*::-webkit-scrollbar-thumb{background:#2bb3a355;border-radius:3px}*::-webkit-scrollbar-track{background:transparent}"; d.head.appendChild(s); }catch(e){} }
+function smallStage(){ try{ const d = frame.contentDocument; const g = d && d.querySelector('[class*="stage-size-toggle-group"]'); const b = g && g.querySelectorAll("button"); if(b && b.length > 1 && !/highlighted/.test(b[0].className)) b[0].click(); }catch(e){} }
 window.addEventListener("message", e => {
   if(e.source !== frame.contentWindow) return;
   const m = e.data || {};
-  if(m.type === "scratch-ready"){ entReady = true; openProblem(); return; }
+  if(m.type === "scratch-ready"){ entReady = true; smallStage(); slimBars(); openProblem(); return; }
   if(m.id && pending[m.id]){ pending[m.id](m); delete pending[m.id]; }
 });
 function call(type, payload = {}, transfer = [], timeout = 20000){

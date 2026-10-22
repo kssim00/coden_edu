@@ -48,6 +48,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .zoomctl span{min-width:42px;text-align:center}
 #pzoom{right:auto;left:12px;position:fixed;bottom:70px}
 #left{overflow:auto}
+#left{scrollbar-width:thin;scrollbar-color:#e8913a55 transparent}#left::-webkit-scrollbar{width:6px}#left::-webkit-scrollbar-track{background:transparent}#left::-webkit-scrollbar-thumb{background:#e8913a55;border-radius:3px}#left::-webkit-scrollbar-thumb:hover{background:#e8913aaa}
 #left .note{padding:20px;color:#8a5a22}
 #split{width:7px;cursor:col-resize;background:#ecd9c0;flex:none}
 #split:hover,#split.drag{background:var(--or)}
@@ -353,7 +354,7 @@ function renderBar(){
 }
 async function enterExam(fresh){
   show("exam");
-  if(!frame.getAttribute("src")) frame.src = "entry_frame.html";
+  if(!frame.getAttribute("src")) frame.src = "entry_frame.html?theme=or";
   renderBar(); renderPdf(curQ());
   clearInterval(timerId); timerId = null;
   if(sess.phase === "exam"){ tick(); timerId = setInterval(tick, 1000); }
