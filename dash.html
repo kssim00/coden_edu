@@ -465,8 +465,12 @@
      않고 글자 그대로 toggleWithdraw('${s.id}')가 전달됨 → 학생을 못 찾고 조용히 종료.
      수정: 문자열 연결(+s.id+)로 바꿔 실제 학생 id가 전달되게 함. (학생 카드의 재원 버튼은
      템플릿 문자열 안이라 원래 정상이었음.)
+   v10 (2026-10-27, 해결 확인됨): 기능 변경 — 결석(✕) 도트를 누르면 곧바로 출석(✓)으로 바뀌어
+     진도내용을 적을 수 없던 문제. 수정: 결석 도트를 누르면 그 결석 기록이 지워져 빈칸이 되고,
+     그 상태에서 기존 "수업 기록" 폼으로 진도내용을 입력해 출석 처리함. 결석 외 도트는 기존대로
+     클릭할 때마다 상태 순환. 도트 툴팁에 "클릭하면 빈칸으로" 안내 추가.
    ──────────────────────────────────────────────────────────── */
-const APP_VERSION = 'v9';
+const APP_VERSION = 'v10';
 document.addEventListener('DOMContentLoaded', () => {
   const v = document.getElementById('appVersion');
   if (v) v.textContent = APP_VERSION;
@@ -1407,7 +1411,7 @@ function renderCardAttRow(s, viewM){
     const isRealDate=ma.slotRealDate&&ma.slotRealDate[i];
     const dateLbl=(raw&&isRealDate)?(()=>{const p=raw.split('/');return p[0]+'월 '+p[1]+'일';})():'';
     const stLbl=st==='done'?'출석':st==='absent'?'결석':st==='makeup'?'보충완료':'미수업';
-    const tip=dateLbl?`${dateLbl} (${stLbl})`:stLbl;
+    const tip=(dateLbl?`${dateLbl} (${stLbl})`:stLbl)+(st==='absent'?' — 클릭하면 빈칸으로':'');
     return `<span class="m-dot ${st}" title="${tip}" onclick="toggleDot('${s.id}',${i},${viewM})">${icon}</span>`;
   }).join('');
   const sk=safeId(s.id);
@@ -1852,6 +1856,12 @@ function toggleDot(sid,dotIdx,targetM){
   setCardViewMonth(s,activeM); // 보기 월도 함께 고정 저장 (새로고침해도 안 바뀌도록)
   const lesson=findSlotLesson(s,activeM,dotIdx);
   const cur=slotStatus(lesson);
+  if(lesson&&cur==='absent'){ // [v10] 결석 칸 → 빈칸(기록 삭제). 이후 기존 "수업 기록" 폼으로 진도내용을 입력
+    s.lessons=s.lessons.filter(l=>l.id!==lesson.id);
+    saveDB(); refreshCard(s); updateSummary();
+    toast(`${s.name} ${activeM}월 ${dotIdx+1}번째 수업 결석 → ⬜ 빈칸 (아래에서 진도 입력)`);
+    return;
+  }
   let next;
   if(!lesson){ next=cur==='empty'?'absent':cur==='absent'?'done':cur==='done'?'makeup':'empty'; } // 미수업→결석→출석→보충
   else if(lesson.manualMark){ next=cur==='absent'?'done':cur==='done'?'makeup':cur==='makeup'?'empty':'absent'; }
