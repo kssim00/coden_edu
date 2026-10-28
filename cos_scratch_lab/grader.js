@@ -47,10 +47,14 @@
   }
 
   /* project.json 하나를 "스프라이트별 스크립트" 구조로 풀어 냅니다 → { 블록키: {object, type, value} } */
+  /* '보기블록' 스프라이트: 힌트용 블록 보관함. 실제 시험처럼 가져다 쓰거나 복제·이동·삭제해도 채점하지 않습니다 */
+  function isHint(t){ return !t.isStage && /보기|힌트/.test(t.name || ''); }
+
   function normalize(project){
     project = project || {};
     var out = {};
     (project.targets || []).forEach(function(t){
+      if(isHint(t)) return;
       var blocks = t.blocks || {};
       var objName = t.isStage ? '배경(Stage)' : t.name;
 
@@ -70,7 +74,8 @@
         var o = {};
         Object.keys(m).sort().forEach(function(k){
           if(k === 'argumentids' || k === 'children' || k === 'tagName') return;   // 임의 ID는 무시
-          o[k] = m[k];
+          if(b.opcode === 'procedures_call' && k !== 'proccode') return;          // 내 블록 사용: 이름(모양)만 비교 (warp 등은 편집기마다 형식이 달라요)
+          o[k] = (k === 'warp') ? String(m[k]) : m[k];
         });
         return JSON.stringify(o);
       }
@@ -144,7 +149,7 @@
     (project.targets || []).forEach(function(t){ r = r.concat(pick(t)); });
     return r;
   }
-  var spriteNames = function(p){ return names(p, function(t){ return t.isStage ? [] : [t.name]; }); };
+  var spriteNames = function(p){ return names(p, function(t){ return (t.isStage || isHint(t)) ? [] : [t.name]; }); };
   var varNames = function(p){ return names(p, function(t){
     return Object.keys(t.variables || {}).map(function(k){ return (t.isStage ? '배경' : t.name) + ' / ' + t.variables[k][0]; });
   }); };
