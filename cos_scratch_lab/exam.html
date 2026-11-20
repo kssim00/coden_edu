@@ -252,7 +252,38 @@ window.addEventListener("message", e => {
   if(m.type === "scratch-ready"){ entReady = true; if(sess && $("exam").classList.contains("on")) openProblem(); return; }
   if(m.id && pending[m.id]){ pending[m.id](m); delete pending[m.id]; }
 });
+/* 저장된 풀이(sb3)가 스크래치에서 열리는 모양인지 확인하고, 레이어 순서만 어긋났으면 바로잡아요.
+   반환: 그대로면 원래 buf, 고쳤으면 새 buf, 고칠 수 없으면(무대가 없거나 둘 이상) null */
+function fixSb3(buf){
+  try{
+    const u8 = new Uint8Array(buf);
+    const pj = fflate.unzipSync(u8, {filter: f => f.name === "project.json"})["project.json"];
+    if(!pj) return buf;                                   // sb2 등은 건드리지 않아요
+    const p = JSON.parse(fflate.strFromU8(pj));
+    if(!p || !Array.isArray(p.targets)) return buf;
+    const stages = p.targets.filter(t => t.isStage), sprites = p.targets.filter(t => !t.isStage);
+    if(stages.length !== 1) return null;
+    const ok = p.targets[0].isStage && (stages[0].layerOrder === undefined || stages[0].layerOrder === 0) &&
+      sprites.every(t => t.layerOrder === undefined || (Number.isInteger(t.layerOrder) && t.layerOrder >= 1));
+    if(ok) return buf;
+    stages[0].layerOrder = 0;
+    sprites.map((t, i) => ({t, i, o: Number.isFinite(t.layerOrder) ? t.layerOrder : i}))
+      .sort((a, b) => a.o - b.o || a.i - b.i).forEach((x, n) => { x.t.layerOrder = n + 1; });
+    p.targets = stages.concat(sprites);
+    const all = fflate.unzipSync(u8);
+    all["project.json"] = fflate.strToU8(JSON.stringify(p));
+    const out = fflate.zipSync(all, {level: 1});
+    return out.buffer.slice(out.byteOffset, out.byteOffset + out.byteLength);
+  }catch(e){ return buf; }
+}
+/* 편집기에는 한 번에 한 가지만 시켜요 (불러오기가 겹치면 두 문제가 섞여 저장될 수 있어요) */
+let callChain = Promise.resolve();
 function call(type, payload = {}, transfer = [], timeout = 20000){
+  const p = callChain.then(() => callNow(type, payload, transfer, timeout));
+  callChain = p.catch(() => {});
+  return p;
+}
+function callNow(type, payload, transfer, timeout){
   return new Promise((resolve, reject) => {
     const id = ++seq;
     const t = setTimeout(() => { delete pending[id]; reject(new Error("스크래치 편집기 응답이 없어요")); }, timeout);
@@ -302,18 +333,27 @@ async function openProblem(){
   const q = curQ(), token = ++openToken, k = workKey(q);
   loadedQ = null; reviewMode = false; $("bAnswer").textContent = "정답 보기";
   try{
-    const saved = await idbGet(k);
-    const buf = saved ? saved.slice(0) : (await getEnt("start", q)).slice(0);
+    const saved = await idbGet(k), good = saved && fixSb3(saved);
+    let opened = false;
+    if(good){
+      try{ const buf = good.slice(0); await call("load", {buf}, [buf]); opened = true; }catch(e){ console.error(e); }
+    }
     if(token !== openToken) return;
-    await call("load", {buf}, [buf]);
-    if(token !== openToken) return;
+    if(!opened){
+      /* 저장된 풀이가 없거나 열 수 없으면 처음 상태로 열어요 (못 연 풀이는 따로 보관) */
+      if(saved){ await idbSet(k + "|broken", saved); toast("저장된 풀이를 열 수 없어서 처음 상태로 열었어요."); }
+      const buf = (await getEnt("start", q)).slice(0);
+      if(token !== openToken) return;
+      await call("load", {buf}, [buf]);
+      if(token !== openToken) return;
+    }
     loadedQ = q;
   }catch(err){ toast("불러오기 실패: " + err.message); }
 }
 async function saveCurrent(){
   if(!entReady || loadedQ == null || reviewMode) return;
   const q = loadedQ;
-  try{ const r = await call("export", {}, [], 8000); await idbSet(workKey(q), r.buf); }catch(e){}
+  try{ const r = await call("export", {}, [], 8000); const b = fixSb3(r.buf); if(!b) return; await idbSet(workKey(q), b); }catch(e){}
 }
 setInterval(() => { if($("exam").classList.contains("on")) saveCurrent(); }, 10000);
 
@@ -443,7 +483,7 @@ $("upFiles").onchange = async e => {
       const buf = (await map[q].arrayBuffer()).slice(0);
       await call("load", {buf}, [buf], 60000);
       const r = await call("export", {}, [], 20000);
-      await idbSet(workKey(q), r.buf);
+      await idbSet(workKey(q), fixSb3(r.buf) || r.buf);
     }
   }catch(err){ alert("파일을 읽지 못했어요: " + (err.message || err)); return; }
   loadedQ = null;                      // 지금 화면 내용이 방금 올린 풀이를 덮어쓰지 않게

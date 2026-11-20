@@ -269,7 +269,38 @@ window.addEventListener("message", e => {
   if(m.type === "scratch-ready"){ entReady = true; openProblem(); return; }
   if(m.id && pending[m.id]){ pending[m.id](m); delete pending[m.id]; }
 });
+/* 저장된 풀이(sb3)가 스크래치에서 열리는 모양인지 확인하고, 레이어 순서만 어긋났으면 바로잡아요.
+   반환: 그대로면 원래 buf, 고쳤으면 새 buf, 고칠 수 없으면(무대가 없거나 둘 이상) null */
+function fixSb3(buf){
+  try{
+    const u8 = new Uint8Array(buf);
+    const pj = fflate.unzipSync(u8, {filter: f => f.name === "project.json"})["project.json"];
+    if(!pj) return buf;                                   // sb2 등은 건드리지 않아요
+    const p = JSON.parse(fflate.strFromU8(pj));
+    if(!p || !Array.isArray(p.targets)) return buf;
+    const stages = p.targets.filter(t => t.isStage), sprites = p.targets.filter(t => !t.isStage);
+    if(stages.length !== 1) return null;
+    const ok = p.targets[0].isStage && (stages[0].layerOrder === undefined || stages[0].layerOrder === 0) &&
+      sprites.every(t => t.layerOrder === undefined || (Number.isInteger(t.layerOrder) && t.layerOrder >= 1));
+    if(ok) return buf;
+    stages[0].layerOrder = 0;
+    sprites.map((t, i) => ({t, i, o: Number.isFinite(t.layerOrder) ? t.layerOrder : i}))
+      .sort((a, b) => a.o - b.o || a.i - b.i).forEach((x, n) => { x.t.layerOrder = n + 1; });
+    p.targets = stages.concat(sprites);
+    const all = fflate.unzipSync(u8);
+    all["project.json"] = fflate.strToU8(JSON.stringify(p));
+    const out = fflate.zipSync(all, {level: 1});
+    return out.buffer.slice(out.byteOffset, out.byteOffset + out.byteLength);
+  }catch(e){ return buf; }
+}
+/* 편집기에는 한 번에 한 가지만 시켜요 (불러오기가 겹치면 두 문제가 섞여 저장될 수 있어요) */
+let callChain = Promise.resolve();
 function call(type, payload = {}, transfer = [], timeout = 20000){
+  const p = callChain.then(() => callNow(type, payload, transfer, timeout));
+  callChain = p.catch(() => {});
+  return p;
+}
+function callNow(type, payload, transfer, timeout){
   return new Promise((resolve, reject)=>{
     const id = ++seq;
     const t = setTimeout(()=>{ delete pending[id]; reject(new Error("스크래치 편집기 응답이 없어요")); }, timeout);
@@ -304,18 +335,27 @@ async function openProblem(){
   const token = ++openToken, k = workKey(state.q);
   loadedKey = null; reviewMode = false; renderAnswerBtn();
   try{
-    const saved = await idbGet(k);
-    const buf = saved ? saved.slice(0) : (await getEnt("start")).slice(0);
+    const saved = await idbGet(k), good = saved && fixSb3(saved);
+    let opened = false;
+    if(good){
+      try{ const buf = good.slice(0); await call("load", {buf}, [buf]); opened = true; }catch(e){ console.error(e); }
+    }
     if(token !== openToken) return;
-    await call("load", {buf}, [buf]);
-    if(token !== openToken) return;
+    if(!opened){
+      /* 저장된 풀이가 없거나 열 수 없으면 처음 상태로 열어요 (못 연 풀이는 따로 보관) */
+      if(saved){ await idbSet(k + "|broken", saved); toast("저장된 풀이를 열 수 없어서 처음 상태로 열었어요."); }
+      const buf = (await getEnt("start")).slice(0);
+      if(token !== openToken) return;
+      await call("load", {buf}, [buf]);
+      if(token !== openToken) return;
+    }
     loadedKey = k;
   }catch(err){ toast("불러오기 실패: " + err.message); }
 }
 async function saveCurrent(){
   if(!entReady || !loadedKey) return;
   const k = loadedKey;
-  try{ const r = await call("export", {}, [], 8000); await idbSet(k, r.buf); store.set(k, {at: Date.now()}); }catch(e){}
+  try{ const r = await call("export", {}, [], 8000); const b = fixSb3(r.buf); if(!b) return; await idbSet(k, b); store.set(k, {at: Date.now()}); }catch(e){}
 }
 setInterval(saveCurrent, 10000);
 window.addEventListener("beforeunload", ()=> { saveCurrent(); });
@@ -330,7 +370,7 @@ $("dlStart").onclick  = async ()=> { try{ dlFile(`${G().data}/s${state.set + 1 +
 $("dlAnswer").onclick = async ()=> { try{ dlFile(`${G().data}/s${state.set + 1 + (G().off || 0)}/answer/${nn(state.q)}.sb2`, fileTag() + "_정답.sb2"); }catch(e){ toast(e.message); } };
 $("dlExport").onclick = async ()=> {
   if(reviewMode){ toast("정답 보기 중에는 저장할 수 없어요."); return; }
-  try{ await saveCurrent(); const r = await call("export"); download(r.buf, "답안_" + fileTag() + ".sb3"); }catch(e){ toast("내려받기 실패: " + e.message); }
+  try{ await saveCurrent(); const r = await call("export"); download(fixSb3(r.buf) || r.buf, "답안_" + fileTag() + ".sb3"); }catch(e){ toast("내려받기 실패: " + e.message); }
 };
 
 /* ---------- 채점 ---------- */
@@ -385,7 +425,8 @@ $("upFile").onchange = async e => {
   if(!confirm(`${state.q}번 문제를 '${f.name}' 파일로 채점할까요?\n지금 화면의 풀이는 이 파일 내용으로 바뀌어요.`)) return;
   try{
     const copy = (await f.arrayBuffer()).slice(0);
-    await call("load", {buf: copy}, [copy]);
+    loadedKey = null;                  // 읽는 동안 자동저장이 끼어들지 않게
+    try{ await call("load", {buf: copy}, [copy]); }catch(err){ openProblem(); throw err; }
     loadedKey = workKey(state.q);
     await saveCurrent();
     $("bGrade").click();
