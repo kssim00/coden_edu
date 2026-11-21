@@ -21,6 +21,11 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .field{display:grid;grid-template-columns:90px 1fr;gap:10px;align-items:center;margin:10px 0}
 .field label{font-weight:700}
 .field input,.field select{padding:9px 10px;border:1px solid #cdbba5;border-radius:8px;font:inherit;width:100%}
+.modes{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
+.mode{display:flex;flex-direction:column;gap:4px;text-align:left;border:2px solid #e3d9cc;border-radius:10px;padding:12px 14px;background:#fff;color:inherit}
+.mode:hover{border-color:var(--or)}
+.mode.on{border-color:var(--or);background:var(--or-l)}
+.mode small{font-size:12px;color:#7a6f63}
 .btn{border:0;border-radius:10px;padding:10px 18px;font-weight:700;background:var(--or);color:#fff}
 .btn:hover:not(:disabled){background:var(--or-d)}
 .btn.ghost{background:#fff;color:#8a5a22;border:1px solid var(--or)}
@@ -92,15 +97,19 @@ dialog ul{padding-left:18px;margin:8px 0;max-height:46vh;overflow:auto}
 <!-- 1. 시작 화면 -->
 <section id="start" class="screen on">
   <div class="card">
-    <h1>COS 엔트리 시험 모드</h1>
+    <h1>COS 엔트리 연습실</h1>
     <div class="sub">실제 시험처럼 1번부터 풀고, 제출한 뒤 틀린 문제를 다시 풀어요 · 비공식 연습</div>
+    <div class="modes" role="group" aria-label="풀이 모드">
+      <button class="mode" id="modePractice" type="button" aria-pressed="false"><b>연습 모드</b><small>문제를 골라 풀고 바로 채점·정답 확인</small></button>
+      <button class="mode on" id="modeExam" type="button" aria-pressed="true"><b>시험 모드</b><small>시간을 재고 1번부터 순서대로 풀기</small></button>
+    </div>
     <div class="field"><label for="selGrade">급수</label><select id="selGrade"></select></div>
     <div class="field"><label for="selSet">세트</label><select id="selSet"></select></div>
     <div class="field"><label for="inName">이름</label><input id="inName" placeholder="홍길동" autocomplete="off"></div>
     <div class="field" style="display:none"><label for="inId">아이디</label><input id="inId" placeholder="hong (선택)" autocomplete="off"></div>
     <div id="resumeBox" class="resume" hidden></div>
     <button class="btn big" id="btnBegin">시험 시작</button>
-    <div class="links"><a href="index.html">← 연습 모드(문제 골라 풀기)</a><button class="linkbtn" id="btnCsv">기록 CSV 내려받기</button></div>
+    <div class="links" style="justify-content:flex-end"><button class="linkbtn" id="btnCsv">기록 CSV 내려받기</button></div>
   </div>
 </section>
 
@@ -186,12 +195,14 @@ function initStart(){
     o.textContent = "Entry " + g + (CONFIG.grades[g].data ? "" : " (준비 중)");
     o.disabled = !CONFIG.grades[g].data; sg.appendChild(o);
   });
-  sg.value = "3급";
+  const h = new URLSearchParams(location.hash.slice(1));      // 연습 모드 화면에서 넘어올 때 급수·세트 유지
+  sg.value = CONFIG.grades[h.get("g")] ? h.get("g") : "3급";
   const fillSets = () => {
     const ss = $("selSet"); ss.innerHTML = "";
     CONFIG.grades[sg.value].sets.forEach((s, i) => { const o = document.createElement("option"); o.value = i; o.textContent = s; ss.appendChild(o); });
   };
   sg.onchange = fillSets; fillSets();
+  if(h.has("s") && +h.get("s") >= 0 && +h.get("s") < $("selSet").options.length) $("selSet").value = +h.get("s");
   $("inName").value = store.get("exam:lastName", ""); $("inId").value = "";
   const rb = $("resumeBox");
   if(sess && sess.phase !== "done"){
@@ -203,6 +214,7 @@ function initStart(){
   } else rb.hidden = true;
   show("start");
 }
+$("modePractice").onclick = () => { location.href = "index.html#g=" + encodeURIComponent($("selGrade").value) + "&s=" + $("selSet").value; };
 $("btnBegin").onclick = () => {
   const name = $("inName").value.trim();
   if(!name){ alert("이름을 입력해 주세요."); $("inName").focus(); return; }
