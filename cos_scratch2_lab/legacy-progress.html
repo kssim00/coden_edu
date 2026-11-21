@@ -1,0 +1,32 @@
+<!doctype html><meta charset="utf-8"><script>
+// Import older browser records from this app's former local port.
+addEventListener("message", async event => {
+  if (event.source !== parent || event.data?.type !== "cos-progress-import") return;
+  const origin = new URL(event.origin);
+  if (origin.protocol !== "http:" || origin.hostname !== "127.0.0.1") return;
+  try {
+    const read = key => { try { return JSON.parse(localStorage.getItem(key)); } catch { return null; } };
+    const sessions = Object.values(read("cosScratch:studentSessions") || {});
+    const active = read("cosScratch:activeSession");
+    if (active?.id) sessions.push(active);
+    const answers = [];
+    if (sessions.length) {
+      await new Promise((resolve, reject) => {
+        const request = indexedDB.open("cos-scratch-student-work", 1);
+        request.onupgradeneeded = () => {
+          if (!request.result.objectStoreNames.contains("answers")) request.result.createObjectStore("answers");
+        };
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => {
+          const db = request.result, tx = db.transaction("answers", "readonly");
+          const cursor = tx.objectStore("answers").openCursor();
+          cursor.onsuccess = () => { const row = cursor.result; if (row) { answers.push([row.key, row.value]); row.continue(); } };
+          tx.oncomplete = () => { db.close(); resolve(); };
+          tx.onerror = () => { db.close(); reject(tx.error); };
+        };
+      });
+    }
+    parent.postMessage({type:"cos-progress-records", token:event.data.token, sessions, answers}, event.origin);
+  } catch { parent.postMessage({type:"cos-progress-records", token:event.data.token, sessions:[], answers:[]}, event.origin); }
+});
+</script>

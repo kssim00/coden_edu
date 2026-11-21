@@ -1,0 +1,13 @@
+{
+  "title": "YBM COS Scratch sample problems",
+  "source": "https://www.ybmit.com/cos/cos_sam.jsp",
+  "notice": "Official sample material. Keep local; get permission before public redistribution.",
+  "setsPerGrade": 3,
+  "questionsPerSet": 10,
+  "importedFilesPerGrade": {
+    "1": 90,
+    "2": 90,
+    "3": 90,
+    "4": 90
+  }
+}

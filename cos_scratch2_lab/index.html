@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>COS Scratch 2.0 실전 연습</title>
+  <link rel="stylesheet" href="styles.css?v=20261104-version-25">
+  <script src="app-version.js?v=20261104-version-25" defer></script>
+  <script>
+    window.RufflePlayer = window.RufflePlayer || {};
+    window.RufflePlayer.config = {
+      autoplay: "on",
+      unmuteOverlay: "hidden",
+      logLevel: "warn",
+      quality: "high",
+      letterbox: "on",
+      polyfills: false,
+      deviceFontRenderer: "embedded",
+      fontSources: [
+        "assets/scratch-fonts/scratch.ttf",
+        "assets/scratch-fonts/helvetica.ttf",
+        "assets/scratch-fonts/marker.ttf",
+        "assets/scratch-fonts/mystery.ttf",
+        "assets/scratch-fonts/gloria.ttf",
+        "assets/scratch-fonts/donegal.ttf"
+      ],
+      defaultFonts: {
+        sans: ["Helvetica", "Scratch"],
+        serif: ["Donegal", "Helvetica"],
+        typewriter: ["Scratch"]
+      }
+    };
+  </script>
+  <script src="vendor/ruffle.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="mark">COS</span><strong>Scratch 2.0 실전 연습</strong><span class="badge">YBM 공개 샘플</span></div>
+    <div class="toolbar"><span id="headerContext">연습 모드 · 급수와 세트를 선택하세요</span></div>
+  </header>
+
+  <main id="startScreen" class="start-screen">
+    <section class="start-card">
+      <h1>COS Scratch 2.0 연습실</h1>
+      <p class="app-version" data-app-version aria-label="프로그램 버전"></p>
+      <p class="sub">급수와 세트를 선택하고 이름을 입력한 뒤 시작하세요.</p>
+      <div class="mode-picker" role="group" aria-label="풀이 모드">
+        <button class="mode-option selected" id="practiceMode" type="button" aria-pressed="true"><b>연습 모드</b><small>문제별 채점과 정답 확인</small></button>
+        <button class="mode-option" id="examMode" type="button" aria-pressed="false"><b>시험 모드</b><small>시간을 재고 순서대로 풀기</small></button>
+      </div>
+      <div class="form-grid">
+        <label for="gradeSelect">급수</label><select id="gradeSelect"><option value="1">COS 1급</option><option value="2">COS 2급</option><option value="3" selected>COS 3급</option><option value="4">COS 4급</option></select>
+        <label for="setSelect">세트</label><select id="setSelect"><option value="1">샘플 1</option><option value="2">샘플 2</option><option value="3">샘플 3</option></select>
+        <label for="studentInput">이름</label><input id="studentInput" list="studentNames" maxlength="80" autocomplete="off" placeholder="이름 입력">
+        <datalist id="studentNames"></datalist>
+      </div>
+      <div id="resumeBox" class="resume-box" hidden></div>
+      <div id="startError" class="error" role="alert"></div>
+      <p id="storageNotice" class="privacy-note" role="status" hidden></p>
+      <button id="connectRecordFolder" class="secondary" type="button">저장 폴더 연결</button>
+      <div class="start-actions">
+        <button class="primary" id="startButton" type="button" disabled>기록 불러오는 중…</button>
+        <button class="secondary" id="resumeButton" type="button" hidden disabled>이어서 하기</button>
+        <button class="secondary" id="retryProgress" type="button" hidden>기록 다시 불러오기</button>
+      </div>
+      <p class="privacy-note">저장 폴더를 연결하면 선택한 폴더에 학생 기록을 보관합니다. 연결하지 않아도 문제를 풀 수 있으며, 폴더 저장이 불가능하면 이 브라우저에 저장합니다. 수업을 마칠 때는 ‘저장하고 나가기’를 눌러주세요.</p>
+    </section>
+  </main>
+
+  <main id="workspace" class="workspace" hidden>
+    <section class="question-pane">
+      <div class="question-heading sr-only">
+        <div><small id="questionEyebrow" class="sr-only">COS 공개 샘플</small><h1 id="questionTitle">문제 1</h1></div>
+        <span id="questionScore">미채점</span>
+      </div>
+      <div class="pdf-controls" role="group" aria-label="문제지 확대 및 축소">
+        <button id="pdfZoomOut" type="button" aria-label="문제지 축소">−</button>
+        <output id="pdfZoomLabel" aria-live="polite">100%</output>
+        <button id="pdfZoomIn" type="button" aria-label="문제지 확대">+</button>
+        <button id="pdfFitWidth" type="button">너비 맞춤</button>
+      </div>
+      <div class="pdf-wrap" id="questionPdf" tabindex="0" aria-label="문제 PDF"><p role="status">문제지를 불러오는 중…</p></div>
+    </section>
+    <div class="pane-divider" id="paneDivider" role="separator" aria-label="문제와 편집기 너비 조절" aria-orientation="vertical" aria-valuemin="18" aria-valuemax="42" aria-valuenow="25" tabindex="0"></div>
+    <section class="editor-pane">
+      <span id="editorStatus" class="sr-only" role="status" aria-live="polite">편집기를 불러오는 중…</span>
+      <div id="scratch-host"></div>
+    </section>
+  </main>
+
+  <footer id="workbar" class="workbar" hidden>
+    <div class="student-strip"><b id="studentLabel"></b><span id="modeLabel"></span><small class="work-version" data-app-version aria-label="프로그램 버전"></small><span id="timerLabel" hidden>남은 시간 <b id="timer">--:--</b></span><span class="save-hint" id="saveHint" role="status" aria-live="polite">채점하기를 누르면 현재 블록을 바로 채점합니다</span></div>
+    <nav class="question-nav" id="questionNav" aria-label="문제 선택"></nav>
+    <div class="actions">
+      <button id="gradeButton" class="primary" type="button">채점하기</button>
+      <button id="nextButton" type="button">다음 문제</button>
+      <button id="finishButton" class="dark" type="button" hidden>시험 제출</button>
+      <div class="more-wrap">
+        <button id="moreButton" type="button" aria-expanded="false" aria-controls="moreMenu" aria-label="더보기">⋯</button>
+        <div id="moreMenu" class="more-menu" hidden>
+          <button id="redoButton" type="button">이 문제 다시 풀기</button>
+          <button id="answerButton" type="button" disabled>정답 보기</button>
+          <label class="menu-import">풀이 파일 불러오기<input id="answerFile" type="file" accept=".sb2,application/zip" hidden></label>
+          <button id="homeButton" type="button" hidden>저장하고 나가기</button>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <div id="examGate" class="overlay" hidden>
+    <section class="gate-card"><h2>시험 준비가 되었나요?</h2><p id="gateText"></p><p>시험을 시작하면 제한시간이 시작됩니다. 문제를 풀 때마다 Scratch에서 .sb2로 저장하세요.</p><button id="gateStart" class="primary" type="button">시험 시작</button></section>
+  </div>
+  <div id="resultOverlay" class="overlay" hidden>
+    <section class="result-card">
+      <button id="closeResults" class="close-button" type="button" aria-label="닫기">×</button>
+      <h2 id="resultTitle">채점 결과</h2>
+      <div id="resultSummary" class="result-summary"></div>
+      <div id="resultRows" class="result-rows"></div>
+      <div id="resultActions" class="result-actions"></div>
+    </section>
+  </div>
+
+  <script src="problem-pages.js?v=20261104-prepared-pages-23"></script>
+  <script src="pdf-viewer.js?v=20261104-prepared-pages-23"></script>
+  <script src="celebration.js?v=20261104-perfect-score"></script>
+  <script src="progress-client.js?v=20261104-folder-picker-21"></script>
+  <script src="snapshot-codec.js?v=20261104-json-save-22"></script>
+  <script src="folder-progress.js?v=20261104-json-save-22"></script>
+  <script src="app.js?v=20261104-direct-resume-24"></script>
+</body>
+</html>
