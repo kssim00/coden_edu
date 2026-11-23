@@ -27,6 +27,7 @@ main{flex:1;min-height:0;display:flex}
 .zoomctl button:hover{background:var(--tl-l)}
 .zoomctl span{min-width:42px;text-align:center}
 #left .zoomctl{right:auto;left:12px}
+#ezoom{top:6px;bottom:auto}   /* 2.0 편집기의 확대 버튼(오른쪽 아래)과 겹치지 않게 위로 */
 
 #bar{flex:none;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:10px 16px;background:var(--tl);color:var(--ink);padding:8px 16px;min-height:58px;position:relative}
 .who{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-weight:700}
@@ -84,7 +85,7 @@ dialog::backdrop{background:#0006}
   </section>
   <div id="split" role="separator" aria-label="패널 너비 조정"></div>
   <section id="right">
-    <iframe id="entryFrame" src="scratch/frame.html?locale=ko" title="스크래치 작업 화면" allow="autoplay; fullscreen"></iframe>
+    <iframe id="entryFrame" src="scratch2/frame.html" title="스크래치 작업 화면" allow="autoplay; fullscreen"></iframe>
     <div class="zoomctl" id="ezoom"><button id="eMinus" aria-label="스크래치 축소">−</button><span id="eVal">75%</span><button id="ePlus" aria-label="스크래치 확대">＋</button></div>
   </section>
 </main>
@@ -96,12 +97,13 @@ dialog::backdrop{background:#0006}
   <div class="nums" id="qnums"></div>
   <div class="btns">
     <button class="btn go" id="bGrade">채점하기</button>
-    <button class="btn" id="bUpload" title="스크래치 2.0 오프라인 편집기에서 푼 sb2 파일을 올려 채점해요">📂 sb2 올려서 채점</button><input type="file" id="upFile" accept=".sb2,.sb3" hidden>
+    <input type="file" id="upFile" accept=".sb2" hidden>
     <button class="btn" id="bAnswer">정답 보기 🔒</button>
     <button class="btn" id="bMore">⋯ 더보기</button>
   </div>
   <div id="menu">
     <button id="mAll">📝 이 세트 전체 채점</button>
+    <button id="bUpload" title="다른 곳에서 푼 sb2 파일을 올려 채점해요">📂 sb2 파일 올려서 채점</button>
     <button id="mRedo">↩ 이 문제 처음부터 다시</button>
     <button id="dlStart">⬇ 2.0 문제파일 받기</button>
     <button id="mExam">🧪 시험 모드로 가기</button>
@@ -160,8 +162,8 @@ if(!CONFIG.grades[state.grade] || !CONFIG.grades[state.grade].data) state.grade 
 if(state.set >= CONFIG.grades[state.grade].sets.length) state.set = 0;
 const G = () => CONFIG.grades[state.grade];
 const kk = (p, q = state.q) => `${p}|${state.grade}|${state.set}|${q}`;
-const workKey = q => kk("work", q);
-const entKey = (kind, q = state.q) => `${G().data}/s${state.set + 1 + (G().off || 0)}/${kind}/${nn(q)}.sb3`;
+const workKey = q => kk("work2", q);   // 2.0 편집기 풀이 (3.0 풀이와 섞이지 않게)
+const entKey = (kind, q = state.q) => `${G().data}/s${state.set + 1 + (G().off || 0)}/${kind}/${nn(q)}.sb2`;
 const fileTag = () => `${state.grade}_${G().sets[state.set].replace(/\s+/g,"_")}_${nn(state.q)}`;
 
 /* ---------- 아래 바 ---------- */
@@ -315,12 +317,10 @@ function loadScript(src){
 async function getEnt(kind, q = state.q){
   const k = entKey(kind, q);
   if(!entCache[k]){
-    if(!(window.__SB3 && window.__SB3[k])) await loadScript(k.replace(/\.sb3$/, ".js"));
-    const b64 = window.__SB3 && window.__SB3[k];
-    if(!b64) throw new Error("자료 형식 오류");
-    const bin = atob(b64), u8 = new Uint8Array(bin.length);
-    for(let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
-    entCache[k] = u8.buffer; delete window.__SB3[k];
+    /* 스크래치 2.0 편집기용: 원본 sb2 파일을 그대로 읽어요 */
+    const res = await fetch(k);
+    if(!res.ok) throw new Error("파일을 찾을 수 없어요: " + k);
+    entCache[k] = await res.arrayBuffer();
   }
   return entCache[k];
 }
@@ -370,7 +370,7 @@ $("dlStart").onclick  = async ()=> { try{ dlFile(`${G().data}/s${state.set + 1 +
 $("dlAnswer").onclick = async ()=> { try{ dlFile(`${G().data}/s${state.set + 1 + (G().off || 0)}/answer/${nn(state.q)}.sb2`, fileTag() + "_정답.sb2"); }catch(e){ toast(e.message); } };
 $("dlExport").onclick = async ()=> {
   if(reviewMode){ toast("정답 보기 중에는 저장할 수 없어요."); return; }
-  try{ await saveCurrent(); const r = await call("export"); download(fixSb3(r.buf) || r.buf, "답안_" + fileTag() + ".sb3"); }catch(e){ toast("내려받기 실패: " + e.message); }
+  try{ await saveCurrent(); const r = await call("export"); download(fixSb3(r.buf) || r.buf, "답안_" + fileTag() + ".sb2"); }catch(e){ toast("내려받기 실패: " + e.message); }
 };
 
 /* ---------- 채점 ---------- */

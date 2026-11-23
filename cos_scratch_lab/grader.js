@@ -149,21 +149,118 @@
     (project.targets || []).forEach(function(t){ r = r.concat(pick(t)); });
     return r;
   }
-  var spriteNames = function(p){ return names(p, function(t){ return (t.isStage || isHint(t)) ? [] : [t.name]; }); };
-  var varNames = function(p){ return names(p, function(t){
+  var spriteNamesS3 = function(p){ return names(p, function(t){ return (t.isStage || isHint(t)) ? [] : [t.name]; }); };
+  var varNamesS3 = function(p){ return names(p, function(t){
     return Object.keys(t.variables || {}).map(function(k){ return (t.isStage ? '배경' : t.name) + ' / ' + t.variables[k][0]; });
   }); };
-  var listNames = function(p){ return names(p, function(t){
+  var listNamesS3 = function(p){ return names(p, function(t){
     return Object.keys(t.lists || {}).map(function(k){ return (t.isStage ? '배경' : t.name) + ' / ' + t.lists[k][0]; });
   }); };
 
+
+  /* ---------- 스크래치 2.0(sb2) project.json 지원 ----------
+     sb2 블록은 [명령, 입력...] 배열입니다. sb3와 같은 방식(스프라이트 / 시작 블록 / 스레드 / 위치)으로 열쇠를 만들어
+     시작·정답·학생 파일을 모두 sb2로 비교합니다. */
+  var LABELS2 = {
+    'forward:':'움직이기','turnRight:':'오른쪽으로 회전','turnLeft:':'왼쪽으로 회전','gotoSpriteOrMouse:':'위치로 이동','gotoX:y:':'x:y: 위치로 이동',
+    'glideSecs:toX:y:elapsed:from:':'x:y: 위치로 이동(초)','heading:':'방향 보기','pointTowards:':'쪽 보기','changeXposBy:':'x 좌표 바꾸기','xpos:':'x 좌표 정하기',
+    'changeYposBy:':'y 좌표 바꾸기','ypos:':'y 좌표 정하기','bounceOffEdge':'벽에 닿으면 튕기기','setRotationStyle':'회전 방식 정하기',
+    'xpos':'x 좌표','ypos':'y 좌표','heading':'방향',
+    'say:duration:elapsed:from:':'말하기(초)','say:':'말하기','think:duration:elapsed:from:':'생각하기(초)','think:':'생각하기',
+    'lookLike:':'모양 바꾸기','nextCostume':'다음 모양','startScene':'배경 바꾸기','nextScene':'다음 배경','changeSizeBy:':'크기 바꾸기','setSizeTo:':'크기 정하기',
+    'changeGraphicEffect:by:':'효과 바꾸기','setGraphicEffect:to:':'효과 정하기','filterReset':'효과 지우기','show':'보이기','hide':'숨기기',
+    'comeToFront':'맨 앞으로 보내기','goBackByLayers:':'레이어 이동','costumeIndex':'모양 번호','scale':'크기',
+    'playSound:':'소리 재생','doPlaySoundAndWait':'소리 재생(끝까지)','stopAllSounds':'모든 소리 끄기','changeVolumeBy:':'음량 바꾸기','setVolumeTo:':'음량 정하기',
+    'whenGreenFlag':'깃발을 클릭했을 때','whenKeyPressed':'키를 눌렀을 때','whenClicked':'스프라이트를 클릭했을 때','whenSceneStarts':'배경이 바뀌었을 때',
+    'whenSensorGreaterThan':'~보다 클 때','whenIReceive':'메시지를 받았을 때','broadcast:':'메시지 보내기','doBroadcastAndWait':'메시지 보내고 기다리기',
+    'wait:elapsed:from:':'기다리기','doRepeat':'반복하기','doForever':'무한 반복하기','doIf':'만약 ~라면','doIfElse':'만약 ~라면 아니면',
+    'doWaitUntil':'~까지 기다리기','doUntil':'~까지 반복하기','stopScripts':'멈추기','whenCloned':'복제되었을 때','createCloneOf':'복제하기','deleteClone':'이 복제본 삭제하기',
+    'touching:':'~에 닿았는가?','touchingColor:':'색에 닿았는가?','color:sees:':'색이 색에 닿았는가?','distanceTo:':'~까지의 거리','doAsk':'묻고 기다리기','answer':'대답',
+    'keyPressed:':'키를 눌렀는가?','mousePressed':'마우스를 클릭했는가?','mouseX':'마우스 x','mouseY':'마우스 y','timer':'타이머','timerReset':'타이머 초기화',
+    'getAttribute:of:':'~의 ~','+':'+','-':'-','*':'×','/':'÷','randomFrom:to:':'난수','>':'>','<':'<','=':'=','&':'그리고','|':'또는','not':'아니다',
+    'concatenate:with:':'결합하기','letter:of:':'글자','stringLength:':'길이','%':'나머지','rounded':'반올림','computeFunction:of:':'수학 연산',
+    'setVar:to:':'변수 정하기','changeVar:by:':'변수 바꾸기','showVariable:':'변수 보이기','hideVariable:':'변수 숨기기','readVariable':'변수',
+    'append:toList:':'리스트에 추가','deleteLine:ofList:':'리스트에서 삭제','insert:at:ofList:':'리스트에 삽입','setLine:ofList:to:':'리스트 항목 바꾸기',
+    'getLine:ofList:':'리스트 항목','lineCountOfList:':'리스트 길이','list:contains:':'리스트 포함 여부','showList:':'리스트 보이기','hideList:':'리스트 숨기기','contentsOfList:':'리스트',
+    'procDef':'블록 정의','call':'내 블록 사용','getParam':'블록 입력값',
+    'clearPenTrails':'지우기','stampCostume':'도장 찍기','putPenDown':'펜 내리기','putPenUp':'펜 올리기','penColor:':'펜 색 정하기',
+    'changePenHueBy:':'펜 색 바꾸기','setPenHueTo:':'펜 색 정하기','changePenShadeBy:':'펜 명암 바꾸기','setPenShadeTo:':'펜 명암 정하기','changePenSizeBy:':'펜 굵기 바꾸기','penSize:':'펜 굵기 정하기'
+  };
+  var C_SLOTS = {doIf:[2], doIfElse:[2,3], doRepeat:[2], doForever:[1], doUntil:[2], doForeverIf:[2], doWhile:[2]};
+  function isSb2(p){ return !!p && !p.targets && (Array.isArray(p.children) || p.objName !== undefined); }
+  function sb2Objects(p){
+    var list = [{o: p, stage: true}];
+    (p.children || []).forEach(function(c){ if(c && c.objName !== undefined && !c.listName && !c.cmd) list.push({o: c, stage: false}); });
+    return list;
+  }
+  function isStackArr(v){ return Array.isArray(v) && (v.length === 0 || Array.isArray(v[0])); }
+  function isBlockArr(v){ return Array.isArray(v) && typeof v[0] === 'string'; }
+  function subSlots(b){
+    var fixed = C_SLOTS[b[0]], r = [];
+    for(var i = 1; i < b.length; i++){ if((fixed && fixed.indexOf(i) >= 0) || isStackArr(b[i])) r.push(i); }
+    return r;
+  }
+  function expr2(b){
+    if(!isBlockArr(b)) return String(num(b));
+    if(b[0] === 'procDef') return 'procDef[' + b[1] + ']';
+    var slots = subSlots(b), parts = [];
+    for(var i = 1; i < b.length; i++){
+      if(slots.indexOf(i) >= 0) continue;
+      var v = b[i];
+      parts.push(isBlockArr(v) ? '(' + expr2(v) + ')' : (v == null ? 'null' : (Array.isArray(v) ? JSON.stringify(v) : String(num(v)))));
+    }
+    return b[0] + '[' + parts.join(',') + ']';
+  }
+  function subs2(b){
+    if(!isBlockArr(b)) return '';
+    return subSlots(b).map(function(i){ var s = b[i]; return '{' + (Array.isArray(s) ? s.map(function(q){ return expr2(q) + subs2(q); }).join(';') : '') + '}'; }).join('');
+  }
+  function normalize2(project){
+    var out = {};
+    sb2Objects(project).forEach(function(x){
+      var t = x.o;
+      if(!x.stage && /보기|힌트/.test(t.objName || '')) return;
+      var objName = x.stage ? '배경(Stage)' : t.objName, groups = {};
+      (t.scripts || []).forEach(function(sc){
+        var list = Array.isArray(sc) ? sc[2] : null;
+        if(!Array.isArray(list) || !list.length) return;
+        var ev = expr2(list[0]);
+        (groups[ev] = groups[ev] || []).push(list);
+      });
+      Object.keys(groups).sort().forEach(function(ev){
+        var threads = groups[ev].sort(function(a, b){
+          var x1 = JSON.stringify(a.map(function(q){ return expr2(q) + subs2(q); })), y1 = JSON.stringify(b.map(function(q){ return expr2(q) + subs2(q); }));
+          return x1 < y1 ? -1 : (x1 > y1 ? 1 : 0);
+        });
+        threads.forEach(function(thread, ti){
+          (function walk(list, path){
+            list.forEach(function(b, i){
+              var key = objName + ' / ' + ev + ' / ' + ti + path + '/' + i;
+              out[key] = {object: objName, type: isBlockArr(b) ? b[0] : 'value', value: expr2(b)};
+              if(!isBlockArr(b)) return;
+              subSlots(b).forEach(function(si, j){ if(Array.isArray(b[si])) walk(b[si], path + '/' + i + ':' + j); });
+            });
+          })(thread, '');
+        });
+      });
+    });
+    return out;
+  }
+  var spriteNames2 = function(p){ return sb2Objects(p).filter(function(x){ return !x.stage && !/보기|힌트/.test(x.o.objName || ''); }).map(function(x){ return x.o.objName; }); };
+  var varNames2 = function(p){ var r = []; sb2Objects(p).forEach(function(x){ (x.o.variables || []).forEach(function(v){ r.push((x.stage ? '배경' : x.o.objName) + ' / ' + v.name); }); }); return r; };
+  var listNames2 = function(p){ var r = []; sb2Objects(p).forEach(function(x){ (x.o.lists || []).forEach(function(v){ r.push((x.stage ? '배경' : x.o.objName) + ' / ' + v.listName); }); }); return r; };
+
   /* 시작·정답·학생 project를 비교해 점수와 항목별 결과를 만듭니다 */
   function grade(starter, answer, student){
-    var a = normalize(answer), b = normalize(starter), s = normalize(student);
+    var sb2 = isSb2(answer);
+    var N = sb2 ? normalize2 : normalize, L = sb2 ? LABELS2 : LABELS;
+    var spriteNames = sb2 ? spriteNames2 : spriteNamesS3, varNames = sb2 ? varNames2 : varNamesS3, listNames = sb2 ? listNames2 : listNamesS3;
+    if(sb2 !== isSb2(student)) throw new Error(sb2 ? '스크래치 2.0(sb2) 답안이 아니에요.' : '스크래치 3.0(sb3) 답안이 아니에요.');
+    var a = N(answer), b = N(starter), s = N(student);
     var targets = Object.keys(a).filter(function(k){ return !b[k] || a[k].value !== b[k].value; });
     var deleted = Object.keys(b).filter(function(k){ return !a[k]; });
     var checks = targets.map(function(k){
-      return {label: a[k].object + ' · ' + (LABELS[a[k].type] || '블록 수정'), ok: !!s[k] && s[k].value === a[k].value};
+      return {label: a[k].object + ' · ' + (L[a[k].type] || '블록 수정'), ok: !!s[k] && s[k].value === a[k].value};
     });
     deleted.forEach(function(k){ checks.push({label: b[k].object + ' · 불필요한 블록 제거', ok: !s[k]}); });
     // 스프라이트·변수·리스트 구성이 시작 파일과 정답 파일에서 다르면 항목으로 확인
@@ -186,10 +283,10 @@
   /* sb3(zip) 바이트에서 project.json만 꺼내기 (fflate 필요) */
   function readProject(buf){
     var files = root.fflate.unzipSync(new Uint8Array(buf), {filter: function(f){ return f.name === 'project.json'; }});
-    if(!files['project.json']) throw new Error('sb3 안에 project.json이 없어요.');
+    if(!files['project.json']) throw new Error('파일 안에 project.json이 없어요.');
     return JSON.parse(TD.decode(files['project.json']));
   }
 
-  root.CosGrader = {normalize: normalize, grade: grade, readProject: readProject, LABELS: LABELS};
+  root.CosGrader = {normalize: normalize, normalize2: normalize2, grade: grade, readProject: readProject, LABELS: LABELS};
   if(typeof module !== 'undefined') module.exports = root.CosGrader;
 })(typeof window !== 'undefined' ? window : globalThis);

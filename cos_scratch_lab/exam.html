@@ -46,6 +46,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .zoomctl button{border:0;background:none;width:26px;height:26px;border-radius:50%;font-size:16px;color:#7a4a12}
 .zoomctl button:hover{background:var(--or-l)}
 .zoomctl span{min-width:42px;text-align:center}
+#ezoom{top:6px;bottom:auto}   /* 2.0 편집기의 확대 버튼(오른쪽 아래)과 겹치지 않게 위로 */
 #pzoom{right:auto;left:12px;position:fixed;bottom:70px}
 #left{overflow:auto}
 #left{scrollbar-width:thin;scrollbar-color:#e8913a55 transparent}#left::-webkit-scrollbar{width:6px}#left::-webkit-scrollbar-track{background:transparent}#left::-webkit-scrollbar-thumb{background:#e8913a55;border-radius:3px}#left::-webkit-scrollbar-thumb:hover{background:#e8913aaa}
@@ -122,7 +123,7 @@ dialog ul{padding-left:18px;margin:8px 0;max-height:46vh;overflow:auto}
     </div>
     <div class="btns">
       <button class="btn" id="bDl2" title="스크래치 2.0 오프라인 편집기로 풀 때 쓰는 문제 파일이에요">⬇ 2.0 문제파일</button>
-      <button class="btn" id="bUp2" title="2.0으로 푼 파일을 한꺼번에 올려서 제출해요">📂 2.0 파일 올려 제출</button><input type="file" id="upFiles" accept=".sb2,.sb3" multiple hidden>
+      <button class="btn" id="bUp2" title="2.0으로 푼 파일을 한꺼번에 올려서 제출해요">📂 2.0 파일 올려 제출</button><input type="file" id="upFiles" accept=".sb2" multiple hidden>
       <button class="btn" id="bRedo">다시풀기</button>
       <button class="btn" id="bSkip">건너뛰기</button>
       <button class="btn" id="bAnswer" hidden>정답 보기</button>
@@ -183,8 +184,8 @@ function toast(t){ const e = $("toast"); e.textContent = t; e.style.display = "b
 let sess = store.get("exam:sess", null);
 const saveSess = () => store.set("exam:sess", sess);
 const G = () => CONFIG.grades[sess.grade];
-const workKey = q => `exam:work|${sess.id}|${q}`;
-const entKey = (kind, q) => `${G().data}/s${sess.set + 1 + (G().off || 0)}/${kind}/${nn(q)}.sb3`;
+const workKey = q => `exam:work2|${sess.id}|${q}`;   // 2.0 편집기 풀이
+const entKey = (kind, q) => `${G().data}/s${sess.set + 1 + (G().off || 0)}/${kind}/${nn(q)}.sb2`;
 const curQ = () => (sess.phase === "retry" ? sess.retryQ : sess.queue)[sess.pos];
 
 /* ---------- 시작 화면 ---------- */
@@ -313,12 +314,10 @@ function loadScript(src){
 async function getEnt(kind, q){
   const k = entKey(kind, q);
   if(!entCache[k]){
-    if(!(window.__SB3 && window.__SB3[k])) await loadScript(k.replace(/\.sb3$/, ".js"));
-    const b64 = window.__SB3 && window.__SB3[k];
-    if(!b64) throw new Error("자료 형식 오류");
-    const bin = atob(b64), u8 = new Uint8Array(bin.length);
-    for(let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
-    entCache[k] = u8.buffer; delete window.__SB3[k];
+    /* 스크래치 2.0 편집기용: 원본 sb2 파일을 그대로 읽어요 */
+    const res = await fetch(k);
+    if(!res.ok) throw new Error("파일을 찾을 수 없어요: " + k);
+    entCache[k] = await res.arrayBuffer();
   }
   return entCache[k];
 }
@@ -405,7 +404,7 @@ function renderBar(){
 }
 async function enterExam(fresh){
   show("exam");
-  if(!frame.getAttribute("src")) frame.src = "scratch/frame.html?locale=ko&theme=or";
+  if(!frame.getAttribute("src")) frame.src = "scratch2/frame.html";
   renderBar(); renderPdf(curQ());
   clearInterval(timerId); timerId = null;
   if(sess.phase === "exam"){ tick(); timerId = setInterval(tick, 1000); }
