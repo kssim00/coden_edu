@@ -83,9 +83,39 @@ dialog::backdrop{background:#0006}
 .rp .row button{border:0;background:var(--tl);color:#fff;border-radius:8px;padding:7px 16px;font-weight:700}
 @media (max-width:900px){#bar{grid-template-columns:1fr}.btns,.nums{justify-content:center}#menu{right:50%;transform:translateX(50%)}}
 @media (max-width:640px){main{flex-direction:column}#left{width:100%;height:45%}#split{display:none}}
+/* 시작 화면 (모드 선택) */
+#start{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;background:var(--tl-l);overflow:auto;padding:24px}
+#start[hidden]{display:none}
+.card{background:#fff;border:2px solid var(--tl);border-radius:16px;padding:28px 32px;width:min(560px,100%);box-shadow:0 6px 24px #0001}
+.card h1{margin:0 0 4px;font-size:24px}
+.card .sub{color:#667;margin-bottom:18px;font-size:13px}
+.modes{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
+.mode{display:flex;flex-direction:column;gap:4px;text-align:left;border:2px solid #d8e0e7;border-radius:10px;padding:12px 14px;background:#fff;color:inherit}
+.mode:hover{border-color:var(--tl)}
+.mode.on{border-color:var(--tl);background:var(--tl-l)}
+.mode small{font-size:12px;color:#677583}
+.field{display:grid;grid-template-columns:90px 1fr;gap:10px;align-items:center;margin:10px 0}
+.field label{font-weight:700}
+.field select{padding:9px 10px;border:1px solid var(--line);border-radius:8px;font:inherit;width:100%}
+#stBegin{width:100%;padding:13px;font-size:17px;margin-top:14px;border:0;border-radius:10px;background:var(--ink);color:#fff;font-weight:700}
+#stBegin:hover{background:#000}
 </style>
 </head>
 <body>
+<!-- 시작 화면: 연습 모드 / 시험 모드 선택 -->
+<section id="start">
+  <div class="card">
+    <h1>COS 스크래치 연습실</h1>
+    <div class="sub">모드와 급수·세트를 고른 뒤 시작하세요 · 스크래치 2.0 · 비공식 연습</div>
+    <div class="modes" role="group" aria-label="풀이 모드">
+      <button class="mode on" id="modePractice" type="button" aria-pressed="true"><b>연습 모드</b><small>문제를 골라 풀고 바로 채점·정답 확인</small></button>
+      <button class="mode" id="modeExam" type="button" aria-pressed="false"><b>시험 모드</b><small>시간을 재고 1번부터 순서대로 풀기</small></button>
+    </div>
+    <div class="field"><label for="stGrade">급수</label><select id="stGrade"></select></div>
+    <div class="field"><label for="stSet">세트</label><select id="stSet"></select></div>
+    <button id="stBegin" type="button">연습 시작</button>
+  </div>
+</section>
 <main>
   <section id="left">
     <div id="pdf" role="region" aria-label="문제 내용"></div>
@@ -112,7 +142,7 @@ dialog::backdrop{background:#0006}
     <button id="mRedo">이 문제 다시 풀기</button>
     <button id="bAnswer">정답 보기 🔒</button>
     <button id="mAll">이 세트 전체 채점</button>
-    <button id="mExam">시험 모드로 가기</button>
+    <button id="mHome">처음 화면 (모드 선택)</button>
     <div id="teacherMenu" hidden>
       <hr><div class="tt">원장님용</div>
       <button id="dlExport">💾 내 답안 저장</button>
@@ -221,7 +251,6 @@ $("bNext").onclick = ()=> { if(state.q >= NQ(state.grade, state.set)) $("mAll").
 $("bMore").onclick = e => { e.stopPropagation(); $("menu").classList.toggle("on"); };
 document.addEventListener("click", e => { if(!$("menu").contains(e.target)) $("menu").classList.remove("on"); });
 $("teacherMenu").hidden = !TEACHER;
-$("mExam").onclick = async ()=> { await saveCurrent(); location.href = "exam.html"; };
 
 /* ---------- 문제지 ---------- */
 const pdfBox = $("pdf");
@@ -452,6 +481,23 @@ $("bAnswer").onclick = async ()=> {
     renderAnswerBtn();
   }catch(e){ reviewMode = false; toast("정답을 열지 못했어요: " + e.message); openProblem(); }
 };
+
+/* ---------- 시작 화면 (모드 선택) ---------- */
+(function(){
+  const sg = $("stGrade"), ss = $("stSet");
+  Object.keys(CONFIG.grades).forEach(g=>{ const o = document.createElement("option"); o.value = g; o.textContent = "Scratch " + g; sg.appendChild(o); });
+  const fillSets = ()=> { ss.innerHTML = ""; CONFIG.grades[sg.value].sets.forEach((t, i)=>{ const o = document.createElement("option"); o.value = i; o.textContent = t; ss.appendChild(o); }); };
+  const h = new URLSearchParams(location.hash.slice(1));      // 시험 모드 화면에서 넘어올 때 급수·세트 유지
+  sg.value = CONFIG.grades[h.get("g")] ? h.get("g") : state.grade; fillSets();
+  const hs = h.has("s") ? +h.get("s") : state.set; ss.value = hs >= 0 && hs < ss.options.length ? hs : 0;
+  sg.onchange = fillSets;
+  $("modeExam").onclick = ()=> { location.href = "exam.html#g=" + encodeURIComponent(sg.value) + "&s=" + ss.value; };
+  $("stBegin").onclick = ()=> {
+    const g = sg.value, v = +ss.value; $("start").hidden = true;
+    if(g !== state.grade || v !== state.set) go(()=>{ state.grade = g; state.set = v; state.q = 1; store.set("grade", g); store.set("set", v); });
+  };
+  $("mHome").onclick = async ()=> { $("menu").classList.remove("on"); await saveCurrent(); sg.value = state.grade; fillSets(); ss.value = state.set; $("start").hidden = false; };
+})();
 
 resizeEntry(); renderBar(); renderPdf();
 </script>
