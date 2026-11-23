@@ -49,6 +49,14 @@ main{flex:1;min-height:0;display:flex}
 #menu.on{display:block}
 #menu button{display:block;width:100%;text-align:left;border:0;background:none;padding:8px 10px;border-radius:8px;color:#25302f}
 #menu button:hover{background:var(--tl-l)}
+/* 오른쪽 아래 버튼·메뉴: 스크래치 2.0 연습실 모양 */
+.btns{gap:7px;flex-wrap:nowrap}
+.btns .btn{padding:10px 15px;font-size:13px;border-radius:9px;font-weight:700;background:#fff;color:#26313a}
+.btns .btn.go{background:var(--ink);color:#fff}
+#bMore{min-width:46px;padding:8px 12px;font-size:22px;line-height:1;color:var(--ink)}
+#menu{bottom:calc(100% + 8px);right:14px;min-width:210px;padding:7px;border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 28px #073b3540}
+#menu button{padding:10px 11px;border-radius:7px;font-size:13px}
+#menu button:disabled{opacity:.5}
 #menu hr{border:0;border-top:1px solid #e5eeec;margin:4px 0}
 #menu .tt{font-size:11px;color:#889;padding:4px 10px 0}
 #toast{position:fixed;left:50%;bottom:76px;transform:translateX(-50%);background:#333;color:#fff;padding:8px 16px;border-radius:20px;display:none;z-index:50;font-size:14px;max-width:90vw}
@@ -97,19 +105,18 @@ dialog::backdrop{background:#0006}
   <div class="nums" id="qnums"></div>
   <div class="btns">
     <button class="btn go" id="bGrade">채점하기</button>
-    <input type="file" id="upFile" accept=".sb2" hidden>
-    <button class="btn" id="bAnswer">정답 보기 🔒</button>
-    <button class="btn" id="bMore">⋯ 더보기</button>
+    <button class="btn" id="bNext">다음 문제</button>
+    <button class="btn" id="bMore" aria-label="더보기">⋯</button>
   </div>
   <div id="menu">
-    <button id="mAll">📝 이 세트 전체 채점</button>
-    <button id="bUpload" title="다른 곳에서 푼 sb2 파일을 올려 채점해요">📂 sb2 파일 올려서 채점</button>
-    <button id="mRedo">↩ 이 문제 처음부터 다시</button>
-    <button id="dlStart">⬇ 2.0 문제파일 받기</button>
-    <button id="mExam">🧪 시험 모드로 가기</button>
+    <button id="mRedo">이 문제 다시 풀기</button>
+    <button id="bAnswer">정답 보기 🔒</button>
+    <button id="mAll">이 세트 전체 채점</button>
+    <button id="mExam">시험 모드로 가기</button>
     <div id="teacherMenu" hidden>
       <hr><div class="tt">원장님용</div>
       <button id="dlExport">💾 내 답안 저장</button>
+      <button id="dlStart">⬇ 문제 파일 받기</button>
       <button id="dlAnswer">⬇ 정답 파일 받기</button>
       <button id="openPdf">📄 문제 PDF 새 창으로</button>
     </div>
@@ -196,7 +203,9 @@ function renderNums(){
 const fails = () => store.get(kk("fails"), 0);
 const answerUnlocked = () => TEACHER || fails() >= UNLOCK_AFTER || (store.get(kk("result"), null) || {}).score >= 100;
 function renderAnswerBtn(){
-  $("bAnswer").textContent = reviewMode ? "내 풀이로" : (answerUnlocked() ? "정답 보기" : "정답 보기 🔒");
+  $("bAnswer").textContent = reviewMode ? "내 풀이로 돌아가기" : (answerUnlocked() ? "정답 보기" : "정답 보기 🔒");
+  $("bAnswer").disabled = !reviewMode && !answerUnlocked();
+  const nb = $("bNext"); if(nb) nb.textContent = state.q >= NQ(state.grade, state.set) ? "전체 채점" : "다음 문제";
 }
 $("gradeSel").onchange = e => { const g = e.target.value; go(()=>{ state.grade = g; state.set = 0; state.q = 1; store.set("grade", g); store.set("set", 0); }); };
 $("setSel").onchange = e => { const v = +e.target.value; go(()=>{ state.set = v; state.q = 1; store.set("set", v); }); };
@@ -208,6 +217,7 @@ async function go(mutate){
 }
 
 /* 더보기 메뉴 */
+$("bNext").onclick = ()=> { if(state.q >= NQ(state.grade, state.set)) $("mAll").click(); else go(()=>{ state.q++; }); };
 $("bMore").onclick = e => { e.stopPropagation(); $("menu").classList.toggle("on"); };
 document.addEventListener("click", e => { if(!$("menu").contains(e.target)) $("menu").classList.remove("on"); });
 $("teacherMenu").hidden = !TEACHER;
@@ -418,21 +428,6 @@ $("bGrade").onclick = async ()=> {
     showReport([r], false);
   }catch(e){ toast("채점 실패: " + e.message); }
 };
-/* 2.0 오프라인 편집기에서 푼 sb2(또는 sb3)를 올려 채점 */
-$("bUpload").onclick = ()=> { if(reviewMode){ toast("정답 보기 중이에요. '내 풀이로'를 눌러 돌아와 주세요."); return; } $("upFile").click(); };
-$("upFile").onchange = async e => {
-  const f = e.target.files[0]; e.target.value = ""; if(!f) return;
-  if(!confirm(`${state.q}번 문제를 '${f.name}' 파일로 채점할까요?\n지금 화면의 풀이는 이 파일 내용으로 바뀌어요.`)) return;
-  try{
-    const copy = (await f.arrayBuffer()).slice(0);
-    loadedKey = null;                  // 읽는 동안 자동저장이 끼어들지 않게
-    try{ await call("load", {buf: copy}, [copy]); }catch(err){ openProblem(); throw err; }
-    loadedKey = workKey(state.q);
-    await saveCurrent();
-    $("bGrade").click();
-  }catch(err){ toast("파일을 열지 못했어요: " + (err.message || err)); }
-};
-
 $("mAll").onclick = async ()=> {
   $("menu").classList.remove("on");
   try{
@@ -444,6 +439,7 @@ $("mAll").onclick = async ()=> {
 
 /* 정답 보기 */
 $("bAnswer").onclick = async ()=> {
+  $("menu").classList.remove("on");
   if(reviewMode){ await openProblem(); return; }
   if(!answerUnlocked()) return;
   if(!confirm("정답 파일을 편집기에 열어요. 지금까지 푼 내용은 저장돼 있어서 '내 풀이로'를 누르면 돌아올 수 있어요. 계속할까요?")) return;

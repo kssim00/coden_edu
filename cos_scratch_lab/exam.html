@@ -67,6 +67,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 #bar .btn:hover:not(:disabled){background:var(--or-l)}
 #bar .btn.go{background:#3b2406;color:#fff}
 #bar .btn.go:hover:not(:disabled){background:#000}
+#bar .btns .btn{padding:10px 15px;font-size:13px;border-radius:9px;border:0}   /* 스크래치 2.0 연습실 버튼 모양 */
 #toast{position:fixed;left:50%;bottom:76px;transform:translateX(-50%);background:#333;color:#fff;padding:8px 16px;border-radius:20px;display:none;z-index:50;font-size:14px}
 
 /* 결과 */
@@ -122,8 +123,6 @@ dialog ul{padding-left:18px;margin:8px 0;max-height:46vh;overflow:auto}
       <div class="pill">⌨ <span id="barProg"></span><span id="barSkip"></span></div>
     </div>
     <div class="btns">
-      <button class="btn" id="bDl2" title="스크래치 2.0 오프라인 편집기로 풀 때 쓰는 문제 파일이에요">⬇ 2.0 문제파일</button>
-      <button class="btn" id="bUp2" title="2.0으로 푼 파일을 한꺼번에 올려서 제출해요">📂 2.0 파일 올려 제출</button><input type="file" id="upFiles" accept=".sb2" multiple hidden>
       <button class="btn" id="bRedo">다시풀기</button>
       <button class="btn" id="bSkip">건너뛰기</button>
       <button class="btn" id="bAnswer" hidden>정답 보기</button>
@@ -396,7 +395,6 @@ function renderBar(){
   $("barProg").textContent = retry ? `틀린 문제 ${sess.retryQ.length}개 중 ${sess.pos + 1}번째 · ${q}번 풀이중` : `총 ${total} 문제 중 ${q}번 풀이중`;
   const skipped = retry ? 0 : sess.queue.slice(sess.pos + 1).filter(x => sess.queue.indexOf(x) <= sess.pos).length;
   $("barSkip").textContent = skipped ? ` (${skipped}문제 건너뜀)` : "";
-  $("bDl2").hidden = $("bUp2").hidden = retry;
   $("bSkip").hidden = retry; $("bGrade").hidden = !retry; $("bAnswer").hidden = !retry;
   const last = sess.pos >= (retry ? sess.retryQ : sess.queue).length - 1;
   $("bNext").textContent = retry ? (last ? "결과 보기" : "다음 틀린문제") : (last ? "제출" : "다음문제");
@@ -412,7 +410,7 @@ async function enterExam(fresh){
   $("gate").classList.toggle("on", gated);
   $("gateTitle").textContent = `Scratch ${sess.grade} · ${G().sets[sess.set]}`;
   $("gateInfo").textContent = `${sess.name}님, 준비되면 시작을 누르세요. 제한시간 ${G().minutes}분 · 총 ${NQ(sess.grade, sess.set)}문제 · 시작하면 시간이 흘러가요.`;
-  ["bRedo","bSkip","bNext","bDl2","bUp2"].forEach(id => $(id).disabled = gated);
+  ["bRedo","bSkip","bNext"].forEach(id => $(id).disabled = gated);
   if(entReady) openProblem();
 }
 async function goTo(pos){
@@ -423,7 +421,7 @@ async function goTo(pos){
 
 $("gateGo").onclick = () => {
   sess.started = true; sess.deadline = Date.now() + G().minutes * 60000; saveSess();
-  $("gate").classList.remove("on"); ["bRedo","bSkip","bNext","bDl2","bUp2"].forEach(id => $(id).disabled = false);
+  $("gate").classList.remove("on"); ["bRedo","bSkip","bNext"].forEach(id => $(id).disabled = false);
   tick();
 };
 $("bNext").onclick = async () => {
@@ -448,45 +446,6 @@ $("bSkip").onclick = async () => {
 $("bRedo").onclick = () => {
   if(!confirm("이 문제를 처음 상태부터 다시 풀까요? 지금까지 푼 내용은 사라져요.")) return;
   idbDel(workKey(curQ())); loadedQ = null; openProblem();
-};
-
-/* ---------- 2.0 파일 (오프라인 편집기로 푼 경우) ---------- */
-$("bDl2").onclick = async () => {
-  const P = NQ(sess.grade, sess.set);
-  if(!confirm(`${P}문제의 2.0 문제 파일을 모두 받을까요?\n파일 이름은 01.sb2, 02.sb2 … 처럼 문제 번호예요.\n(여러 파일 받기를 허용하라는 창이 뜨면 '허용'을 눌러 주세요)`)) return;
-  for(let q = 1; q <= P; q++){
-    const a = document.createElement("a"); a.href = `${G().data}/s${sess.set + 1 + (G().off || 0)}/start/${nn(q)}.sb2`; a.download = `${nn(q)}.sb2`;
-    document.body.appendChild(a); a.click(); a.remove();
-    await new Promise(r => setTimeout(r, 500));
-  }
-  toast("문제 파일을 모두 받았어요.");
-};
-const qOfName = n => { const m = n.replace(/\.[^.]*$/, "").replace(/\(\d+\)\s*$/, "").match(/(\d+)(?!.*\d)/); return m ? +m[1] : 0; };
-$("bUp2").onclick = () => $("upFiles").click();
-$("upFiles").onchange = async e => {
-  const files = [...e.target.files]; e.target.value = ""; if(!files.length) return;
-  const P = NQ(sess.grade, sess.set), map = {}, skipped = [];
-  for(const f of files){ const q = qOfName(f.name); if(q >= 1 && q <= P && !map[q]) map[q] = f; else skipped.push(f.name); }
-  const got = Object.keys(map).map(Number).sort((a, b) => a - b);
-  if(!got.length){ alert("문제 번호를 찾지 못했어요.\n파일 이름을 1.sb2, 2.sb2 … 처럼 문제 번호로 해 주세요."); return; }
-  let msg = `${got.length}개 파일을 올렸어요.\n` + got.map(q => `${q}번 ← ${map[q].name}`).join("\n");
-  const missing = []; for(let q = 1; q <= P; q++) if(!map[q]) missing.push(q);
-  if(missing.length) msg += `\n\n올리지 않은 문제: ${missing.join(", ")}번\n(이 화면에서 푼 내용이 없으면 0점이에요)`;
-  if(skipped.length) msg += `\n\n번호를 못 찾아 뺀 파일: ${skipped.join(", ")}`;
-  msg += "\n\n이대로 제출할까요? 제출하면 시험이 끝나요.";
-  if(!confirm(msg)) return;
-  loadedQ = null; openToken++;         // 읽는 동안 자동저장이 엉뚱한 문제에 덮어쓰지 않게
-  try{
-    for(const q of got){
-      toast(`${q}번 파일을 읽는 중…`);
-      const buf = (await map[q].arrayBuffer()).slice(0);
-      await call("load", {buf}, [buf], 60000);
-      const r = await call("export", {}, [], 20000);
-      await idbSet(workKey(q), fixSb3(r.buf) || r.buf);
-    }
-  }catch(err){ alert("파일을 읽지 못했어요: " + (err.message || err)); return; }
-  loadedQ = null;                      // 지금 화면 내용이 방금 올린 풀이를 덮어쓰지 않게
-  submitExam("2.0 파일로 제출했어요.");
 };
 
 /* ---------- 채점 · 제출 ---------- */
